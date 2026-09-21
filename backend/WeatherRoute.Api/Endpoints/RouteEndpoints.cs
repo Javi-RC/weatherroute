@@ -45,12 +45,15 @@ public static class RouteEndpoints
 
         group.MapPost("/routes/analyses", async (
             SaveAnalysisRequest request,
+            IGeocodingProvider geocoding,
             IAnalysisRepository repository,
             CancellationToken ct) =>
         {
+            var originCoord = await geocoding.GeocodeAsync(request.Origin, ct);
+            var destinationCoord = await geocoding.GeocodeAsync(request.Destination, ct);
             var record = new RouteAnalysisRecord(
                 Guid.NewGuid(), request.Origin, request.Destination,
-                new Coordinates(0, 0), new Coordinates(0, 0),
+                originCoord, destinationCoord,
                 request.Activity,
                 request.DepartureTime.Kind == DateTimeKind.Utc ? request.DepartureTime : DateTime.SpecifyKind(request.DepartureTime, DateTimeKind.Utc),
                 request.DistanceKm, request.DurationMinutes, request.RiskScore, request.RiskLevel,
