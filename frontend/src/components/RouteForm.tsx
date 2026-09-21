@@ -8,7 +8,6 @@ export const routeSchema = z.object({
   activity: z.enum(["Walking", "Running", "Cycling", "Motorcycle", "Driving"]),
   date: z.string().min(1, "Fecha requerida"),
   time: z.string().min(1, "Hora requerida"),
-  maxDurationMinutes: z.number().positive().optional(),
 });
 
 export type RouteFormValues = z.infer<typeof routeSchema>;

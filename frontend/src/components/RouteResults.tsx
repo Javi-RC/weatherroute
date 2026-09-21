@@ -8,7 +8,9 @@ export default function RouteResults({ result }: { result: RouteAnalysisResponse
   if (result.routes.length === 0) {
     return (
       <div className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
-        No se pudieron calcular rutas. {result.status === "partial" && "El proveedor meteorológico no está disponible."}
+        No se pudieron calcular rutas.
+        {result.routeAvailable === false && " No se pudo obtener una ruta para los datos indicados."}
+        {result.weatherAvailable === false && " El proveedor meteorológico no está disponible."}
       </div>
     );
   }
