@@ -1,6 +1,7 @@
 import type { RouteAnalysisResponse } from "../types";
 import ComparisonTable from "./ComparisonTable";
 import RiskBreakdown from "./RiskBreakdown";
+import RouteMap from "./RouteMap";
 import WeatherTimeline from "./WeatherTimeline";
 
 export default function RouteResults({ result }: { result: RouteAnalysisResponse }) {
@@ -14,6 +15,7 @@ export default function RouteResults({ result }: { result: RouteAnalysisResponse
 
   return (
     <section className="mt-6 space-y-4">
+      <RouteMap routes={result.routes} />
       {result.recommendation && (
         <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 font-medium">
           {result.recommendation}
