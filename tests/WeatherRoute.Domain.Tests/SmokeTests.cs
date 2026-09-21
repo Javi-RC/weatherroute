@@ -1,10 +1,13 @@
+using WeatherRoute.Domain.ValueObjects;
+
 namespace WeatherRoute.Domain.Tests;
 
 public class SmokeTests
 {
     [Fact]
-    public void Runner_Works()
+    public void Domain_Assembly_Resolves()
     {
-        Assert.True(true);
+        var coordinates = new Coordinates(0, 0);
+        Assert.NotNull(coordinates);
     }
 }
