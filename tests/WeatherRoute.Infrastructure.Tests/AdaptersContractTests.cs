@@ -32,8 +32,9 @@ public class AdaptersContractTests : IAsyncLifetime
     {
         var key = Environment.GetEnvironmentVariable("OPENROUTESERVICE_API_KEY");
         if (string.IsNullOrEmpty(key)) return; // CI without secret: skip
-        var adapter = new OpenRouteServiceRoutingAdapter(_http,
-            new OpenRouteServiceOptions { BaseUrl = "https://api.openrouteservice.org", ApiKey = key });
+        var options = new OpenRouteServiceOptions { BaseUrl = "https://api.openrouteservice.org", ApiKey = key };
+        using var ors = new HttpClient { BaseAddress = new Uri(options.BaseUrl) };
+        var adapter = new OpenRouteServiceRoutingAdapter(ors, options);
 
         var coord = await ((IGeocodingProvider)adapter).GeocodeAsync("Ciudad Real");
 
