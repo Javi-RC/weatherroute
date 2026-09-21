@@ -10,7 +10,7 @@ namespace WeatherRoute.Api.IntegrationTests;
 
 public sealed class AnalysisPersistenceTests : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .WithDatabase("weatherroute")
         .WithUsername("weatherroute")
         .WithPassword("weatherroute")
