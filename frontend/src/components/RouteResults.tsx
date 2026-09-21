@@ -1,4 +1,7 @@
 import type { RouteAnalysisResponse } from "../types";
+import ComparisonTable from "./ComparisonTable";
+import RiskBreakdown from "./RiskBreakdown";
+import WeatherTimeline from "./WeatherTimeline";
 
 export default function RouteResults({ result }: { result: RouteAnalysisResponse }) {
   if (result.routes.length === 0) {
@@ -16,6 +19,7 @@ export default function RouteResults({ result }: { result: RouteAnalysisResponse
           {result.recommendation}
         </div>
       )}
+      {result.routes.length > 1 && <ComparisonTable routes={result.routes} />}
       {result.routes.map((route, i) => (
         <article key={route.providerId} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -51,6 +55,8 @@ export default function RouteResults({ result }: { result: RouteAnalysisResponse
               ))}
             </tbody>
           </table>
+          <RiskBreakdown score={route.riskScore} level={route.riskLevel} factors={route.factors} />
+          <WeatherTimeline route={route} />
         </article>
       ))}
     </section>
