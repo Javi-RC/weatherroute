@@ -23,7 +23,6 @@ jobs:
         run: dotnet test backend/WeatherRoute.slnx --no-build --filter "Category=Integration"
         env:
           OPENROUTESERVICE_API_KEY: ${{ secrets.OPENROUTESERVICE_API_KEY }}
-        continue-on-error: true
 
   frontend:
     runs-on: ubuntu-latest
@@ -41,4 +40,4 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - run: npm run lint || true
+      - run: npm run lint
