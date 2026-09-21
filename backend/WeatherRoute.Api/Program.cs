@@ -13,6 +13,7 @@ using WeatherRoute.Application.Ports.In;
 using WeatherRoute.Application.Ports.Out;
 using WeatherRoute.Application.Services;
 using WeatherRoute.Api.Endpoints;
+using WeatherRoute.Api.Errors;
 using WeatherRoute.Api.Health;
 using WeatherRoute.Api.Requests;
 using WeatherRoute.Domain.Enums;
@@ -96,6 +97,9 @@ builder.Services.AddOpenTelemetry()
         m.AddConsoleExporter();
     });
 
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<AppDbContext>("postgres", tags: ["ready"]);
 
@@ -131,11 +135,27 @@ if (builder.Configuration.GetValue<bool>("Persistence:AutoMigrate", true))
     }
 }
 app.UseCors();
+app.UseExceptionHandler();
 app.MapControllers();
 app.MapGet("/", () => "WeatherRoute API");
 app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false });                         // liveness
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = r => r.Tags.Contains("ready") }); // readiness
 app.MapRouteEndpoints();
+
+if (builder.Configuration.GetValue<bool>("Test:EnableExceptionProbe"))
+{
+    app.MapGet("/test/exception/{kind}", (string kind) =>
+    {
+        Exception exception = kind switch
+        {
+            "cancel" => new OperationCanceledException("client closed request"),
+            "geocoding" => new GeocodingException("No geocoding result for 'test'."),
+            _ => new InvalidOperationException("boom")
+        };
+        throw exception;
+    });
+}
+
 app.Run();
 
 public partial class Program;

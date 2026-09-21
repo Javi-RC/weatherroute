@@ -39,15 +39,8 @@ public static class RouteEndpoints
             CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(q)) return Results.BadRequest(new { error = "Missing q." });
-            try
-            {
-                var coord = await geocoding.GeocodeAsync(q, ct);
-                return Results.Ok(new { query = q, coordinates = new { lat = coord.Latitude, lon = coord.Longitude } });
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                return Results.NotFound(new { error = ex.Message });
-            }
+            var coord = await geocoding.GeocodeAsync(q, ct);
+            return Results.Ok(new { query = q, coordinates = new { lat = coord.Latitude, lon = coord.Longitude } });
         });
 
         group.MapPost("/routes/analyses", async (
