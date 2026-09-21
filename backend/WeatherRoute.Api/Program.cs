@@ -7,6 +7,7 @@ using WeatherRoute.Application.Services;
 using WeatherRoute.Api.Endpoints;
 using WeatherRoute.Api.Requests;
 using WeatherRoute.Domain.Enums;
+using WeatherRoute.Infrastructure.Caching;
 using WeatherRoute.Infrastructure.Persistence;
 using WeatherRoute.Infrastructure.Routing;
 using WeatherRoute.Infrastructure.Weather;
@@ -16,6 +17,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<OpenRouteServiceOptions>(
     builder.Configuration.GetSection(nameof(OpenRouteServiceOptions)));
+builder.Services.Configure<CachingOptions>(
+    builder.Configuration.GetSection(nameof(CachingOptions)));
 
 builder.Services.AddTransient<IRouteSampler, RouteSampler>();
 builder.Services.AddSingleton<IRouteRiskEngine, RouteRiskEngine>();
@@ -34,7 +37,23 @@ builder.Services.AddTransient<IWeatherProvider>(_ => new OpenMeteoWeatherAdapter
 {
     BaseAddress = new Uri("https://api.open-meteo.com")
 }));
-builder.Services.AddScoped<ICalculateRouteUseCase, WeatherRoute.Application.UseCases.CalculateRouteUseCase>();
+
+var redis = builder.Configuration.GetConnectionString("Redis");
+if (string.IsNullOrWhiteSpace(redis))
+    builder.Services.AddDistributedMemoryCache();
+else
+    builder.Services.AddStackExchangeRedisCache(o => o.Configuration = redis);
+
+builder.Services.AddScoped<WeatherRoute.Application.UseCases.CalculateRouteUseCase>();
+builder.Services.AddScoped<ICalculateRouteUseCase>(sp =>
+{
+    var inner = sp.GetRequiredService<WeatherRoute.Application.UseCases.CalculateRouteUseCase>();
+    var cache = sp.GetRequiredService<Microsoft.Extensions.Caching.Distributed.IDistributedCache>();
+    var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<CachingOptions>>().Value;
+    return string.Equals(options.Provider, "Redis", StringComparison.OrdinalIgnoreCase)
+        ? new CachedCalculateRouteUseCase(inner, cache, options)
+        : inner;
+});
 
 builder.Services.AddHttpClient("ors", (sp, client) =>
 {
