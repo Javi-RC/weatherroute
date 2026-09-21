@@ -1,5 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <ItemGroup>
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.*" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\WeatherRoute.Infrastructure\WeatherRoute.Infrastructure.csproj" />
     <ProjectReference Include="..\WeatherRoute.Application\WeatherRoute.Application.csproj" />
     <ProjectReference Include="..\WeatherRoute.Domain\WeatherRoute.Domain.csproj" />
