@@ -56,6 +56,39 @@ public class CachedCalculateRouteUseCaseTests
         Assert.Equal(2, calls);
     }
 
+    [Fact]
+    public async Task Different_MaxDuration_Are_Not_Cached_Together()
+    {
+        int calls = 0;
+        var inner = new FakeInner(() =>
+        {
+            calls++;
+            return new RouteAnalysisResponse(true, true, null, Array.Empty<RouteCandidate>());
+        });
+        var useCase = new CachedCalculateRouteUseCase(inner, new MemoryDistributedCache(Microsoft.Extensions.Options.Options.Create(new MemoryDistributedCacheOptions())), Options, Json);
+        var baseCommand = CalculateRouteCommand_();
+        var filtered = baseCommand with { MaxDurationMinutes = 120 };
+
+        await useCase.ExecuteAsync(baseCommand);
+        await useCase.ExecuteAsync(filtered);
+
+        Assert.Equal(2, calls);
+    }
+
+    [Fact]
+    public void BuildKey_Differentiates_By_MaxDuration()
+    {
+        var baseCommand = CalculateRouteCommand_();
+        var filtered = baseCommand with { MaxDurationMinutes = 120 };
+
+        Assert.NotEqual(
+            CachedCalculateRouteUseCase.BuildKey(baseCommand),
+            CachedCalculateRouteUseCase.BuildKey(filtered));
+    }
+
+    private static CalculateRouteCommand CalculateRouteCommand_() =>
+        new("Ciudad Real", "Almagro", ActivityType.Cycling, new DateTime(2026, 9, 27, 8, 0, 0, DateTimeKind.Utc));
+
     [Theory]
     [InlineData(10, 30, 0)]        
     [InlineData(21, 0, 0)]

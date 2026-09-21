@@ -45,7 +45,7 @@ public sealed class CachedCalculateRouteUseCase : ICalculateRouteUseCase
 
     public static string BuildKey(CalculateRouteCommand command)
     {
-        var raw = $"{command.Origin.ToLowerInvariant()}|{command.Destination.ToLowerInvariant()}|{command.Activity}|{command.DepartureTimeUtc:o}";
+        var raw = $"{command.Origin.ToLowerInvariant()}|{command.Destination.ToLowerInvariant()}|{command.Activity}|{command.DepartureTimeUtc:o}|{command.MaxDurationMinutes}";
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(raw))).ToLowerInvariant();
         return $"route-analysis:{hash}";
     }
