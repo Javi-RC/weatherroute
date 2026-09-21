@@ -56,6 +56,40 @@ public class CachedCalculateRouteUseCaseTests
         Assert.Equal(2, calls);
     }
 
+    [Theory]
+    [InlineData(10, 30, 0)]        
+    [InlineData(21, 0, 0)]
+    [InlineData(23, 45, 0)]
+    public void CalculateTtl_Next_Hour_Is_Reached(int hour, int minute, int second)
+    {
+        var now = new DateTimeOffset(2026, 9, 27, hour, minute, second, TimeSpan.Zero);
+        var nextHour = new DateTimeOffset(2026, 9, 27, hour, 0, 0, TimeSpan.Zero).AddHours(1);
+
+        var ttl = CachedCalculateRouteUseCase.CalculateTtl(now);
+
+        Assert.Equal(nextHour - now, ttl);
+    }
+
+    [Fact]
+    public void CalculateTtl_Rolls_To_Next_Day_At_23h()
+    {
+        var now = new DateTimeOffset(2026, 9, 27, 23, 0, 0, TimeSpan.Zero);
+
+        var ttl = CachedCalculateRouteUseCase.CalculateTtl(now);
+
+        Assert.Equal(TimeSpan.FromHours(1), ttl);
+    }
+
+    [Fact]
+    public void CalculateTtl_Floors_At_One_Minute()
+    {
+        var now = new DateTimeOffset(2026, 9, 27, 23, 59, 59, TimeSpan.Zero);
+
+        var ttl = CachedCalculateRouteUseCase.CalculateTtl(now);
+
+        Assert.Equal(TimeSpan.FromSeconds(60), ttl);
+    }
+
     private sealed class FakeInner(Func<RouteAnalysisResponse> factory) : ICalculateRouteUseCase
     {
         public Task<RouteAnalysisResponse> ExecuteAsync(CalculateRouteCommand command, CancellationToken ct = default) =>

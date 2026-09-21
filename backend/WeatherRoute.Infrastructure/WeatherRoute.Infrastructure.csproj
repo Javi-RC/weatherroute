@@ -7,6 +7,9 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.*" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="WeatherRoute.Infrastructure.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\WeatherRoute.Application\WeatherRoute.Application.csproj" />
     <ProjectReference Include="..\WeatherRoute.Domain\WeatherRoute.Domain.csproj" />
   </ItemGroup>

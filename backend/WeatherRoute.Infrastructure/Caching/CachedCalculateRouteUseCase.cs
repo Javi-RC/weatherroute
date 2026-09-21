@@ -55,11 +55,15 @@ public sealed class CachedCalculateRouteUseCase : ICalculateRouteUseCase
         if (_options.OverrideTtl is { } fixedTtl)
             return new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = fixedTtl };
 
-        var now = DateTimeOffset.UtcNow;
-        var nextHour = new DateTimeOffset(now.Year, now.Month, now.Day, now.Hour + 1, 0, 0, TimeSpan.Zero);
+        return new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = CalculateTtl(DateTimeOffset.UtcNow) };
+    }
+
+    internal static TimeSpan CalculateTtl(DateTimeOffset now)
+    {
+        var nextHour = new DateTimeOffset(now.Year, now.Month, now.Day, now.Hour, 0, 0, TimeSpan.Zero).AddHours(1);
         var ttl = nextHour - now;
         if (ttl < TimeSpan.FromSeconds(60)) ttl = TimeSpan.FromSeconds(60);
         if (ttl > TimeSpan.FromHours(6)) ttl = TimeSpan.FromHours(6);
-        return new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = ttl };
+        return ttl;
     }
 }
