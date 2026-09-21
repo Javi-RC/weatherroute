@@ -60,7 +60,17 @@ public sealed class CalculateRouteUseCase : ICalculateRouteUseCase
                     {
                         weather = null;
                     }
-                    if (weather is not null) hasWeather = true;
+                    if (weather is not null)
+                    {
+                        hasWeather = true;
+                        seg.AssignWeather(new WeatherSnapshot(
+                            weather.TemperatureC is { } tempC ? new Temperature(tempC) : null,
+                            weather.WindKmh is { } windKmh ? new Wind(windKmh) : null,
+                            weather.PrecipitationProbability,
+                            weather.UvIndex,
+                            weather.VisibilityKm,
+                            weather.Condition));
+                    }
 
                     segments.Add(new SegmentResult(seg.StartPointIndex, seg.EndPointIndex, seg.Distance.Km,
                         arrivalUtc, weather));

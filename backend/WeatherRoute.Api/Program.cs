@@ -8,6 +8,7 @@ using WeatherRoute.Api.Requests;
 using WeatherRoute.Domain.Enums;
 using WeatherRoute.Infrastructure.Routing;
 using WeatherRoute.Infrastructure.Weather;
+using WeatherRoute.Domain.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,7 +16,8 @@ builder.Services.Configure<OpenRouteServiceOptions>(
     builder.Configuration.GetSection(nameof(OpenRouteServiceOptions)));
 
 builder.Services.AddTransient<IRouteSampler, RouteSampler>();
-builder.Services.AddTransient<IRiskAssessmentService, DefaultRiskService>();
+builder.Services.AddSingleton<IRouteRiskEngine, RouteRiskEngine>();
+builder.Services.AddTransient<IRiskAssessmentService, RouteRiskAssessmentService>();
 builder.Services.AddSingleton<IGeocodingProvider>(sp =>
 {
     var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OpenRouteServiceOptions>>().Value;

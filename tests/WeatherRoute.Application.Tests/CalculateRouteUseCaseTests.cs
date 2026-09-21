@@ -5,6 +5,7 @@ using WeatherRoute.Application.Ports.In;
 using WeatherRoute.Application.Services;
 using WeatherRoute.Application.UseCases;
 using WeatherRoute.Domain.Enums;
+using WeatherRoute.Domain.Services;
 
 namespace WeatherRoute.Application.Tests;
 
@@ -13,7 +14,7 @@ public class CalculateRouteUseCaseTests
     private static ICalculateRouteUseCase Build(FakeWeather weather) => new CalculateRouteUseCase(
         new FakeGeocoder(),
         new FakeRouteProvider(),
-        weather, new RouteSampler(), new DefaultRiskService());
+        weather, new RouteSampler(), new RouteRiskAssessmentService(new RouteRiskEngine()));
 
     [Fact]
     public async Task Returns_Two_Weather_Enriched_Routes()
@@ -59,5 +60,20 @@ public class CalculateRouteUseCaseTests
         Assert.Equal("partial", result.Status);
         Assert.False(result.WeatherAvailable);
         Assert.True(result.RouteAvailable);
+    }
+
+    [Fact]
+    public async Task Risk_Is_Computed_From_Weather()
+    {
+        var useCase = Build(new FakeWeather());
+        var result = await useCase.ExecuteAsync(new CalculateRouteCommand(
+            "Ciudad Real", "Almagro", ActivityType.Cycling,
+            new DateTime(2026, 9, 27, 8, 0, 0, DateTimeKind.Utc), null));
+
+        Assert.All(result.Routes, r =>
+        {
+            Assert.InRange(r.RiskScore, 0, 100);
+            Assert.NotEmpty(r.Factors); // FakeWeather wind 30 → Cycling WIND factor (+25) → score 75
+        });
     }
 }
