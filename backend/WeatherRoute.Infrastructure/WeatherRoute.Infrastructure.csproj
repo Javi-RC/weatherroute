@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\WeatherRoute.Application\WeatherRoute.Application.csproj" />
+    <ProjectReference Include="..\WeatherRoute.Domain\WeatherRoute.Domain.csproj" />
+  </ItemGroup>
+</Project>

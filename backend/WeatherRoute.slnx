@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="../tests/WeatherRoute.Application.Tests/WeatherRoute.Application.Tests.csproj" />
+  <Project Path="../tests/WeatherRoute.Domain.Tests/WeatherRoute.Domain.Tests.csproj" />
+  <Project Path="../tests/WeatherRoute.Infrastructure.Tests/WeatherRoute.Infrastructure.Tests.csproj" />
+  <Project Path="WeatherRoute.Api/WeatherRoute.Api.csproj" />
+  <Project Path="WeatherRoute.Application/WeatherRoute.Application.csproj" />
+  <Project Path="WeatherRoute.Domain/WeatherRoute.Domain.csproj" />
+  <Project Path="WeatherRoute.Infrastructure/WeatherRoute.Infrastructure.csproj" />
+</Solution>
