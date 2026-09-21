@@ -7,6 +7,7 @@ export interface AnalyzeRequest {
   destination: string;
   activity: ActivityType;
   departureTime: string;
+  maxDurationMinutes?: number | null;
 }
 
 export interface RiskFactor {

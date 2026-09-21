@@ -8,6 +8,7 @@ export const routeSchema = z.object({
   activity: z.enum(["Walking", "Running", "Cycling", "Motorcycle", "Driving"]),
   date: z.string().min(1, "Fecha requerida"),
   time: z.string().min(1, "Hora requerida"),
+  maxDurationMinutes: z.number().positive().max(1440).optional(),
 });
 
 export type RouteFormValues = z.infer<typeof routeSchema>;
@@ -52,6 +53,10 @@ export default function RouteForm({ onSubmit, loading }: Props) {
       <label className="block">
         <span className="text-sm font-medium">Salida</span>
         <input type="time" {...register("time")} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" />
+      </label>
+      <label className="block">
+        <span className="text-sm font-medium">Duración máx. (min)</span>
+        <input type="number" min={1} {...register("maxDurationMinutes", { setValueAs: (v) => (v === "" ? undefined : Number(v)) })} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" placeholder="Opcional" />
       </label>
       <div className="flex items-end">
         <button type="submit" disabled={loading} className="w-full rounded-md bg-blue-700 px-4 py-2 font-semibold text-white disabled:opacity-50">
