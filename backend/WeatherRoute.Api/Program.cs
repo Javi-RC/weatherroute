@@ -2,14 +2,18 @@ using System.Text.Json.Serialization;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
+using StackExchange.Redis;
 using WeatherRoute.Application.Telemetry;
 using WeatherRoute.Application.Ports.In;
 using WeatherRoute.Application.Ports.Out;
 using WeatherRoute.Application.Services;
 using WeatherRoute.Api.Endpoints;
+using WeatherRoute.Api.Health;
 using WeatherRoute.Api.Requests;
 using WeatherRoute.Domain.Enums;
 using WeatherRoute.Infrastructure.Caching;
@@ -47,21 +51,39 @@ builder.Services.AddTransient<IWeatherProvider>(sp =>
 });
 
 var redis = builder.Configuration.GetConnectionString("Redis");
-if (string.IsNullOrWhiteSpace(redis))
-    builder.Services.AddDistributedMemoryCache();
+var useRedis = string.Equals(
+    builder.Configuration[$"{nameof(CachingOptions)}:Provider"],
+    "Redis",
+    StringComparison.OrdinalIgnoreCase)
+    && !string.IsNullOrWhiteSpace(redis);
+
+if (useRedis)
+{
+    builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+        ConnectionMultiplexer.Connect(GetRedisConfigurationOptions(redis!)));
+    builder.Services.AddStackExchangeRedisCache(o => o.ConfigurationOptions = GetRedisConfigurationOptions(redis!));
+}
 else
-    builder.Services.AddStackExchangeRedisCache(o => o.Configuration = redis);
+{
+    builder.Services.AddDistributedMemoryCache();
+}
 
 builder.Services.AddScoped<WeatherRoute.Application.UseCases.CalculateRouteUseCase>();
 builder.Services.AddScoped<ICalculateRouteUseCase>(sp =>
 {
     var inner = sp.GetRequiredService<WeatherRoute.Application.UseCases.CalculateRouteUseCase>();
-    var cache = sp.GetRequiredService<Microsoft.Extensions.Caching.Distributed.IDistributedCache>();
-    var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<CachingOptions>>().Value;
-    return string.Equals(options.Provider, "Redis", StringComparison.OrdinalIgnoreCase)
-        ? new CachedCalculateRouteUseCase(inner, cache, options)
-        : inner;
+    var cache = sp.GetRequiredService<IDistributedCache>();
+    var options = sp.GetRequiredService<IOptions<CachingOptions>>().Value;
+    var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CachedCalculateRouteUseCase>>();
+    return new CachedCalculateRouteUseCase(inner, cache, options, null, logger);
 });
+
+static ConfigurationOptions GetRedisConfigurationOptions(string connectionString)
+{
+    var options = ConfigurationOptions.Parse(connectionString);
+    options.AbortOnConnectFail = false;
+    return options;
+}
 
 builder.Services.AddWeatherRouteResilience();
 
@@ -76,6 +98,12 @@ builder.Services.AddOpenTelemetry()
 
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<AppDbContext>("postgres", tags: ["ready"]);
+
+if (useRedis)
+    builder.Services.AddHealthChecks().AddCheck<RedisHealthCheck>(
+        "redis",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: ["ready"]);
 
 builder.Services.AddValidatorsFromAssemblyContaining<CalculateRouteRequestValidator>();
 
