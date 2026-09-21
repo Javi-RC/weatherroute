@@ -11,7 +11,7 @@ public interface IActivityRiskStrategy
 
 public sealed record SnapshotSummary(
     double? MeanTemp, double? MaxWind, double? MaxPrecipProb, int? MaxUv,
-    double? MinVisibility, bool WorstWasRain, bool WorstWasStorm, bool WorstWasSnow);
+    double? MinVisibility, bool HasPrecipitation, bool WorstWasStorm, bool WorstWasSnow);
 
 public static class SnapshotSummarizer
 {
@@ -53,7 +53,7 @@ public sealed class CyclingStrategy : IActivityRiskStrategy
         if (s.MaxPrecipProb is { } prob and >= 40)
             factors.Add(F("RAIN", prob switch { < 60 => 10, _ => 20 }, $"{prob:0}% precipitation chance"));
         if (s.WorstWasStorm) factors.Add(F("STORM", 40, "Storm expected"));
-        if (s.WorstWasRain) factors.Add(F("RAIN", Math.Max(s.MaxPrecipProb is >= 60 ? 20 : 0, 20), "Rain along the route"));
+        if (s.HasPrecipitation) factors.Add(F("RAIN", 20, "Rain along the route"));
         if (s.MinVisibility is { } vis and < 1) factors.Add(F("VISIBILITY", 15, $"Visibility {vis:0.#} km"));
         if (s.MaxUv is { } uv and > 6) factors.Add(F("UV", uv switch { > 8 => 15, _ => 10 }, $"UV index {uv}"));
         return Merge(factors);
@@ -82,7 +82,7 @@ public sealed class DrivingStrategy : IActivityRiskStrategy
         if (s.MaxWind is { } wind and >= 45) factors.Add(CyclingStrategy.Wind("WIND", 30, wind));
         if (s.WorstWasStorm) factors.Add(CyclingStrategy.F("STORM", 45, "Storm expected"));
         if (s.WorstWasSnow) factors.Add(CyclingStrategy.F("SNOW", 30, "Snow expected"));
-        if (s.WorstWasRain) factors.Add(CyclingStrategy.F("RAIN", 25, "Rain along the route"));
+        if (s.HasPrecipitation) factors.Add(CyclingStrategy.F("RAIN", 25, "Rain along the route"));
         if (s.MinVisibility is { } vis and < 1) factors.Add(CyclingStrategy.F("VISIBILITY", 25, $"Visibility {vis:0.#} km"));
         return CyclingStrategy.Merge(factors);
     }
@@ -102,7 +102,7 @@ public sealed class RunningStrategy : IActivityRiskStrategy
             if (p > 0) factors.Add(CyclingStrategy.F("HEAT", p, $"Temperature {t:0.#}°C"));
         }
         if (s.MaxWind is { } wind and >= 35) factors.Add(CyclingStrategy.Wind("WIND", 15, wind));
-        if (s.WorstWasRain) factors.Add(CyclingStrategy.F("RAIN", 15, "Rain along the route"));
+        if (s.HasPrecipitation) factors.Add(CyclingStrategy.F("RAIN", 15, "Rain along the route"));
         if (s.MaxUv is { } uv and > 6) factors.Add(CyclingStrategy.F("UV", 10, $"UV index {uv}"));
         return CyclingStrategy.Merge(factors);
     }
@@ -139,7 +139,7 @@ public sealed class MotorcycleStrategy : IActivityRiskStrategy
         var factors = new List<RiskFactor>();
         if (s.MaxWind is { } wind and >= 35) factors.Add(CyclingStrategy.Wind("WIND", 20, wind));
         if (s.WorstWasStorm) factors.Add(CyclingStrategy.F("STORM", 40, "Storm expected"));
-        if (s.WorstWasRain) factors.Add(CyclingStrategy.F("RAIN", 30, "Rain along the route"));
+        if (s.HasPrecipitation) factors.Add(CyclingStrategy.F("RAIN", 30, "Rain along the route"));
         if (s.MinVisibility is { } vis and < 2) factors.Add(CyclingStrategy.F("VISIBILITY", 15, $"Visibility {vis:0.#} km"));
         if (s.MeanTemp is { } t and (< 5 or > 35)) factors.Add(CyclingStrategy.F("TEMPERATURE", 15, $"Temperature {t:0.#}°C"));
         return CyclingStrategy.Merge(factors);
