@@ -1,0 +1,24 @@
+# Dependencies / build outputs
+**/node_modules
+**/dist
+**/bin
+**/obj
+*.tsbuildinfo
+
+# VCS
+.git
+.gitignore
+
+# Environment
+.env
+.env.*
+*.local
+
+# Tooling / artifacts
+.superpowers
+docs
+deploy
+
+# OS
+Thumbs.db
+.DS_Store
