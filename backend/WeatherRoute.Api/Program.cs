@@ -1,11 +1,13 @@
 using System.Text.Json.Serialization;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using WeatherRoute.Application.Ports.In;
 using WeatherRoute.Application.Ports.Out;
 using WeatherRoute.Application.Services;
 using WeatherRoute.Api.Endpoints;
 using WeatherRoute.Api.Requests;
 using WeatherRoute.Domain.Enums;
+using WeatherRoute.Infrastructure.Persistence;
 using WeatherRoute.Infrastructure.Routing;
 using WeatherRoute.Infrastructure.Weather;
 using WeatherRoute.Domain.Services;
@@ -42,6 +44,8 @@ builder.Services.AddHttpClient("ors", (sp, client) =>
 
 builder.Services.AddValidatorsFromAssemblyContaining<CalculateRouteRequestValidator>();
 
+builder.Services.AddWeatherRoutePersistence(builder.Configuration);
+
 var frontend = builder.Configuration["FrontendOrigin"] ?? "http://localhost:5173";
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.WithOrigins(frontend).AllowAnyHeader().AllowAnyMethod()));
 
@@ -50,6 +54,19 @@ builder.Services.AddControllers().AddJsonOptions(o =>
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 var app = builder.Build();
+if (builder.Configuration.GetValue<bool>("Persistence:AutoMigrate", true))
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Database.Migrate();
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(ex, "Database migration skipped.");
+    }
+}
 app.UseCors();
 app.MapControllers();
 app.MapGet("/", () => "WeatherRoute API");

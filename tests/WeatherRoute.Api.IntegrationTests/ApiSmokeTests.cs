@@ -1,5 +1,6 @@
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
@@ -9,7 +10,8 @@ public class ApiSmokeTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly WebApplicationFactory<Program> _factory;
 
-    public ApiSmokeTests(WebApplicationFactory<Program> factory) => _factory = factory;
+    public ApiSmokeTests(WebApplicationFactory<Program> factory) =>
+        _factory = factory.WithWebHostBuilder(b => b.UseSetting("Persistence:AutoMigrate", "false"));
 
     [Fact]
     public async Task Health_Returns_Ok()

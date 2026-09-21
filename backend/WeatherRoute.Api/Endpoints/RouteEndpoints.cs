@@ -4,6 +4,8 @@ using WeatherRoute.Application.Dtos;
 using WeatherRoute.Application.Ports.In;
 using WeatherRoute.Application.Ports.Out;
 using WeatherRoute.Api.Requests;
+using WeatherRoute.Domain.ValueObjects;
+using WeatherRoute.Infrastructure.Persistence;
 
 namespace WeatherRoute.Api.Endpoints;
 
@@ -46,6 +48,22 @@ public static class RouteEndpoints
             {
                 return Results.NotFound(new { error = ex.Message });
             }
+        });
+
+        group.MapPost("/routes/analyses", async (
+            SaveAnalysisRequest request,
+            IAnalysisRepository repository,
+            CancellationToken ct) =>
+        {
+            var record = new RouteAnalysisRecord(
+                Guid.NewGuid(), request.Origin, request.Destination,
+                new Coordinates(0, 0), new Coordinates(0, 0),
+                request.Activity,
+                request.DepartureTime.Kind == DateTimeKind.Utc ? request.DepartureTime : DateTime.SpecifyKind(request.DepartureTime, DateTimeKind.Utc),
+                request.DistanceKm, request.DurationMinutes, request.RiskScore, request.RiskLevel,
+                DateTime.UtcNow);
+            var id = await repository.SaveAsync(record, ct);
+            return Results.Created($"/api/routes/analyses/{id}", new { id });
         });
     }
 }
