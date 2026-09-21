@@ -1,6 +1,11 @@
 using System.Text.Json.Serialization;
 using FluentValidation;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using WeatherRoute.Application.Telemetry;
 using WeatherRoute.Application.Ports.In;
 using WeatherRoute.Application.Ports.Out;
 using WeatherRoute.Application.Services;
@@ -9,6 +14,7 @@ using WeatherRoute.Api.Requests;
 using WeatherRoute.Domain.Enums;
 using WeatherRoute.Infrastructure.Caching;
 using WeatherRoute.Infrastructure.Persistence;
+using WeatherRoute.Infrastructure.Resilience;
 using WeatherRoute.Infrastructure.Routing;
 using WeatherRoute.Infrastructure.Weather;
 using WeatherRoute.Domain.Services;
@@ -33,10 +39,12 @@ builder.Services.AddSingleton<IRouteProvider>(sp =>
     var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OpenRouteServiceOptions>>().Value;
     return new OpenRouteServiceRoutingAdapter(sp.GetRequiredService<IHttpClientFactory>().CreateClient("ors"), options);
 });
-builder.Services.AddTransient<IWeatherProvider>(_ => new OpenMeteoWeatherAdapter(new HttpClient
+builder.Services.AddTransient<IWeatherProvider>(sp =>
 {
-    BaseAddress = new Uri("https://api.open-meteo.com")
-}));
+    var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient("open-meteo");
+    http.BaseAddress = new Uri("https://api.open-meteo.com");
+    return new OpenMeteoWeatherAdapter(http);
+});
 
 var redis = builder.Configuration.GetConnectionString("Redis");
 if (string.IsNullOrWhiteSpace(redis))
@@ -55,11 +63,19 @@ builder.Services.AddScoped<ICalculateRouteUseCase>(sp =>
         : inner;
 });
 
-builder.Services.AddHttpClient("ors", (sp, client) =>
-{
-    var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OpenRouteServiceOptions>>().Value;
-    client.BaseAddress = new Uri(options.BaseUrl);
-});
+builder.Services.AddWeatherRouteResilience();
+
+builder.Services.AddOpenTelemetry()
+    .WithMetrics(m =>
+    {
+        m.AddMeter(Metrics.MeterName);
+        m.AddAspNetCoreInstrumentation();
+        m.AddHttpClientInstrumentation();
+        m.AddConsoleExporter();
+    });
+
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>("postgres", tags: ["ready"]);
 
 builder.Services.AddValidatorsFromAssemblyContaining<CalculateRouteRequestValidator>();
 
@@ -89,7 +105,8 @@ if (builder.Configuration.GetValue<bool>("Persistence:AutoMigrate", true))
 app.UseCors();
 app.MapControllers();
 app.MapGet("/", () => "WeatherRoute API");
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false });                         // liveness
+app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = r => r.Tags.Contains("ready") }); // readiness
 app.MapRouteEndpoints();
 app.Run();
 

@@ -1,7 +1,10 @@
+using System.Diagnostics;
 using WeatherRoute.Application.Dtos;
 using WeatherRoute.Application.Ports.In;
 using WeatherRoute.Application.Ports.Out;
 using WeatherRoute.Application.Services;
+using WeatherRoute.Application.Telemetry;
+using static WeatherRoute.Application.Telemetry.Metrics;
 using WeatherRoute.Domain.Entities;
 using WeatherRoute.Domain.ValueObjects;
 
@@ -31,6 +34,7 @@ public sealed class CalculateRouteUseCase : ICalculateRouteUseCase
 
     public async Task<RouteAnalysisResponse> ExecuteAsync(CalculateRouteCommand command, CancellationToken ct = default)
     {
+        var start = Stopwatch.GetTimestamp();
         try
         {
             var origin = await _geocoding.GeocodeAsync(command.Origin, ct);
@@ -52,14 +56,17 @@ public sealed class CalculateRouteUseCase : ICalculateRouteUseCase
                         (seg.Start.Latitude + seg.End.Latitude) / 2,
                         (seg.Start.Longitude + seg.End.Longitude) / 2);
                     ExternalWeather? weather = null;
+                    var sw = Stopwatch.GetTimestamp();
                     try
                     {
                         weather = await _weather.GetForecastAsync(midpoint, arrivalUtc, ct);
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
+                        WeatherProviderErrors.Add(1);
                         weather = null;
                     }
+                    WeatherApiDuration.Record(Stopwatch.GetElapsedTime(sw).TotalMilliseconds);
                     if (weather is not null)
                     {
                         hasWeather = true;
@@ -95,6 +102,10 @@ public sealed class CalculateRouteUseCase : ICalculateRouteUseCase
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return new RouteAnalysisResponse(false, false, null, Array.Empty<RouteCandidate>());
+        }
+        finally
+        {
+            CoreApiDuration.Record(Stopwatch.GetElapsedTime(start).TotalMilliseconds);
         }
     }
 
