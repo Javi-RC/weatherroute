@@ -19,8 +19,8 @@ public sealed class OpenMeteoWeatherAdapter : IWeatherProvider
     {
         var utc = timestampUtc.ToUniversalTime();
         var path = $"/v1/forecast?" +
-                   $"latitude={coordinates.Latitude.ToString("0.0000")}&" +
-                   $"longitude={coordinates.Longitude.ToString("0.0000")}&" +
+                   $"latitude={coordinates.Latitude.ToString("0.0000", CultureInfo.InvariantCulture)}&" +
+                   $"longitude={coordinates.Longitude.ToString("0.0000", CultureInfo.InvariantCulture)}&" +
                    $"hourly={Hourly}&timezone=UTC&" +
                    $"start_date={utc.Date:yyyy-MM-dd}&end_date={utc.Date.AddDays(1):yyyy-MM-dd}";
 
