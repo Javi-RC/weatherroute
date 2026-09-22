@@ -52,3 +52,8 @@ export interface RouteAnalysisResponse {
   recommendation: string | null;
   routes: RouteCandidate[];
 }
+
+export interface GeocodeResult {
+  lat: number;
+  lon: number;
+}
