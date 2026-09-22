@@ -48,9 +48,11 @@ Decisiones confirmadas:
   (`status: partial` no se comunica).
 - P7 Sin autocomplete: si un lugar no geocodifica, el error llega tarde y
   genérico.
-- P8 Bug de zona horaria: la hora local se envía como UTC
-  (`App.tsx:20`), así que la previsión se consulta ~1–2 h desfasada respecto a
-  la hora que ve el usuario.
+- P8 ~~Bug de zona horaria~~ (descartado tras verificación): el frontend envía
+  el instante UTC correcto (`App.tsx:20`) y el adaptador Open-Meteo consulta
+  con `timezone=UTC` alineando por hora UTC; el tiempo se obtiene para el
+  momento real de salida y `toLocaleTimeString` lo muestra en hora local.
+  Se documentará el contrato con un test, sin cambios de comportamiento.
 - P9 Sin historial ni reutilización de búsquedas.
 - P10 Fecha por defecto hardcodeada (`2026-09-27`) que queda obsoleta.
 
@@ -273,14 +275,11 @@ Principio: el mapa nunca se pierde de vista; nunca hay scroll lateral de tablas.
   `GET /api/geocode?q=...` → lista de candidatos `[{ label, lat, lon, bbox? }]`
   (mapear el resultado `features[]` de la respuesta de OpenRouteService).
   Mantener compatibilidad: si no hay `features`, devolver `[]`.
-- **Zona horaria**: el frontend enviará (además de `departureTime` UTC como
-  hoy) un campo opcional `timeZone` (IANA, de
-  `Intl.DateTimeFormat().resolvedOptions().timeZone`). El backend podrá
-  usarlo para consultar Open-Meteo con `timezone=<iana>` y alinear las horas
-  de la previsión a la hora local del usuario. El envío del campo es parte de
-  la Fase 3 (planner); el cambio backend (parámetro opcional + uso en
-  Open-Meteo + validación IANA) se agrupa con el trabajo de geocode en la
-  Fase 6. No bloquea el resto del rediseño.
+- **Zona horaria**: verificación en la auditoría de implementación: el manejo
+  UTC actual (envío del instante UTC + `timezone=UTC` en Open-Meteo +
+  `toLocaleTimeString` en la UI) ya produce horas de previsión y de llegada
+  **correctas** para el usuario. No se cambia el comportamiento; se añade un
+  test que documenta el contrato (hora local ↔ instante UTC → hora Open-Meteo).
 
 ## 9. Testing
 
@@ -314,7 +313,7 @@ Relación impacto/esfuerzo (1–5): los de mayor ratio primero.
 | 11 | Auto re-análisis debounced | P2 | 4 | 2 | 2.00 |
 | 12 | Autocomplete + ampliación backend geocode | P2 | 4 | 3 | 1.33 |
 | 13 | Historial reciente (localStorage + React Query) | P2 | 3 | 2 | 1.50 |
-| 14 | Zona horaria (IANA) correcta | P2 | 4 | 3 | 1.33 |
+| 14 | Test de contrato horas UTC/local (documenta la ZT correcta) | P2 | 2 | 1 | 2.00 |
 | 15 | Estados `partial` explícitos + toasts | P2 | 3 | 1 | 3.00 |
 | 16 | Accesibilidad (focus, aria, contraste, skip, reduced-motion) | P2 | 3 | 2 | 1.50 |
 | 17 | AboutModal "Cómo funciona" (score + gratuidad) | P3 | 3 | 1 | 3.00 |
@@ -339,8 +338,9 @@ Relación impacto/esfuerzo (1–5): los de mayor ratio primero.
   `WeatherTimeline` (chart), `riskColor/riskBadge/toColor` duplicados.
 - **Fase 5 — Advanced UX**: auto re-análisis debounced; estados `partial`;
   toasts; `HistorySheet` (localStorage); `AboutModal`.
-- **Fase 6 — Autocomplete**: ampliación backend geocode (lista de candidatos) +
-  autocomplete en Planner + tests backend/frontend + validación de `timeZone`.
+- **Fase 6 — Autocomplete**: ampliación backend geocode (lista de candidatos +
+  nuevo puerto `IGeocodingSearchProvider`) + autocomplete en Planner + tests
+  backend/frontend + test de contrato de horas UTC/local.
 - **Fase 7 — Polish**: accesibilidad completa, microanimaciones con
   reduced-motion, tests finales, verificación con los gates de AGENTS.md y
   commit por paso.
