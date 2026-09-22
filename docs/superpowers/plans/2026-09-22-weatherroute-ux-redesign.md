@@ -134,7 +134,10 @@ plus `frontend/src/i18n/*.test.ts`.
   values have an entry (no `undefined` fallback hit for real values);
   `conditionsLabel` is monotonic at thresholds; `RISK_COLORS` text/bg pairs
   pass a 4.5:1 contrast computation (helper in the test, WCAG formula);
-  `buildRecommendation` picks the expected route and formats Spanish.
+  `buildRecommendation` picks the expected route and formats Spanish;
+  **CSS parity**: parse `frontend/src/index.css` in the test and assert every
+  `--color-risk-*` hex equals the matching `RISK_COLORS` value (kills mirror
+  divergence between `@theme` tokens and the runtime source).
 
 **Gate:** frontend gate (this is where the risk palette lives).
 
@@ -599,13 +602,16 @@ Spec background: current `GET /api/geocode` returns only the first coordinate
    ```
 6. **UT contract test** (fixes T4, documents P8 — the timezone "bug" was a
    false positive; no behavior change):
-   `WeatherTimeContractTests.cs`: with `timezone=UTC` in the Open-Meteo query
-   and the domain using UTC instants, prove that (a) a local departure
-   `2026-09-22T18:00` in `Europe/Madrid` (+02:00) equals UTC `16:00`;
-   (b) Open-Meteo returns the hourly index for UTC hour 16 (assert adapter
-   request URL contains `timezone=UTC`); (c) `toLocaleTimeString("es-ES", …
-   )` on that UTC instant yields "18:00" for a Madrid-tz process. This pins
-   the contract rather than changing behavior.
+   `WeatherTimeContractTests.cs` — unit tests, **no** `Integration` tag (they
+   run in the fast, no-Docker suite). Pin the UTC contract with
+   `TimeZoneInfo.ConvertTimeFromUtc`:
+   (a) `TimeZoneInfo.FindSystemTimeZoneById("Europe/Madrid")`: a local
+   departure `2026-09-22T18:00` (CEST, +02:00) converts from UTC `16:00`;
+   (b) assert (via the existing `StubHandler` pattern) that the
+   `OpenMeteoWeatherAdapter` request URL contains `timezone=UTC`, so the
+   hourly index for UTC 16 matches the user's local 18:00; the frontend
+   display conversion is already covered by Task 3's `format.test.ts`.
+   This pins the contract rather than changing behavior.
 7. **Adapter tests** (`OpenRouteServiceRoutingAdapterTests.cs`): add via the
    existing `StubHandler`/`Build` pattern:
    - `SearchAsync` parses `properties.label`, coords and `bbox`; returns
