@@ -43,7 +43,10 @@ function props(overrides: Partial<ResultsLayerProps> = {}): ResultsLayerProps {
     weatherAvailable: true,
     routeAvailable: true,
     selectedRouteId: null,
+    expandedRouteId: null,
     onSelectRoute: vi.fn(),
+    onToggleExpand: vi.fn(),
+    onCloseDetail: vi.fn(),
     onRetry: vi.fn(),
     onNewSearch: vi.fn(),
     error: null,
@@ -119,18 +122,29 @@ describe("ResultsLayer", () => {
     expect(onSelectRoute).toHaveBeenCalledWith(1);
   });
 
-  it("expands a route detail on the chevron and collapses it again", async () => {
+  it("expands and collapses a route detail through the controlled props", async () => {
     const user = userEvent.setup();
-    render(<ResultsLayer {...props({ viewState: "full" })} />);
+    const onToggleExpand = vi.fn();
+    const { rerender } = render(
+      <ResultsLayer {...props({ viewState: "full", expandedRouteId: null, onToggleExpand })} />,
+    );
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Ampliar ruta" }));
+    expect(onToggleExpand).toHaveBeenCalledWith(0);
+
+    rerender(
+      <ResultsLayer {...props({ viewState: "full", expandedRouteId: 0 })} />,
+    );
     const dialog = screen.getByRole("dialog", { name: "Ruta 1" });
     expect(dialog).toBeInTheDocument();
     expect(within(dialog).getByRole("meter", { name: "Índice de condiciones" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Contraer ruta" }));
+    rerender(
+      <ResultsLayer {...props({ viewState: "full", expandedRouteId: null })} />,
+    );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 

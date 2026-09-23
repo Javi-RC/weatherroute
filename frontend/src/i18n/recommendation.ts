@@ -8,9 +8,7 @@ const SEVERITY: Record<RiskLevel, number> = {
   Severe: 3,
 };
 
-export function buildRecommendation(routes: RouteCandidate[]): string | null {
-  if (routes.length === 0) return null;
-
+export function findBestRouteIndex(routes: RouteCandidate[]): number {
   let bestIndex = 0;
   for (let i = 1; i < routes.length; i++) {
     const current = routes[i];
@@ -21,7 +19,13 @@ export function buildRecommendation(routes: RouteCandidate[]): string | null {
         current.distanceKm < best.distanceKm);
     if (better) bestIndex = i;
   }
+  return bestIndex;
+}
 
+export function buildRecommendation(routes: RouteCandidate[]): string | null {
+  if (routes.length === 0) return null;
+
+  const bestIndex = findBestRouteIndex(routes);
   const best = routes[bestIndex];
   const km = Math.round(best.distanceKm);
   const min = Math.round(best.durationMinutes);

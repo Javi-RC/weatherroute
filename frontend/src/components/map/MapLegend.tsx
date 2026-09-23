@@ -16,7 +16,7 @@ export default function MapLegend() {
   return (
     <div
       aria-label="Leyenda de riesgo"
-      className="pointer-events-none absolute bottom-4 left-4 z-[1] select-none rounded-lg bg-white/90 p-2 shadow-card backdrop-blur"
+      className="pointer-events-none select-none rounded-lg bg-white/90 p-2 shadow-card backdrop-blur"
     >
       <h2 className="sr-only">Leyenda de riesgo</h2>
       <ul className="flex flex-col gap-1">

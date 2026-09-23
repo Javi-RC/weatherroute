@@ -41,10 +41,15 @@ export default function MapCanvas({
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const onSelectRouteRef = useRef(onSelectRoute);
   const paintStateRef = useRef<PaintState>({ routes, selectedRouteId, originPoint, destinationPoint });
+  const isCompactRef = useRef(isCompact);
 
   useEffect(() => {
     onSelectRouteRef.current = onSelectRoute;
   }, [onSelectRoute]);
+
+  useEffect(() => {
+    isCompactRef.current = isCompact;
+  }, [isCompact]);
 
   useEffect(() => {
     paintStateRef.current = { routes, selectedRouteId, originPoint, destinationPoint };
@@ -87,8 +92,8 @@ export default function MapCanvas({
     const bounds = computeBounds(coords);
     if (!bounds) return;
     const extent = new maplibregl.LngLatBounds([bounds.west, bounds.south], [bounds.east, bounds.north]);
-    map.fitBounds(extent, fitBoundsOptions({ isCompact }));
-  }, [isCompact]);
+    map.fitBounds(extent, fitBoundsOptions({ isCompact: isCompactRef.current }));
+  }, []);
 
   const showRoutePopup = useCallback((map: maplibregl.Map, routeIndex: number, lngLat: LngLatLike) => {
     const route = paintStateRef.current.routes[routeIndex];
@@ -164,16 +169,17 @@ export default function MapCanvas({
     const map = mapRef.current;
     if (!map || !paintedRef.current) return;
     paint(map);
-  }, [paint, routes, selectedRouteId, originPoint, destinationPoint]);
+  }, [paint, routes, selectedRouteId, originPoint, destinationPoint, isCompact]);
 
   return <div ref={containerRef} data-testid="map-canvas" className="absolute inset-0" />;
 }
 
 function routePopupHtml(route: MapRouteInput): string {
   const parts: string[] = [];
-  if (route.originLabel || route.destinationLabel) {
-    parts.push(`<strong>${escapeHtml(route.originLabel)} → ${escapeHtml(route.destinationLabel)}</strong>`);
-  }
+  const origin = escapeHtml(route.originLabel.trim());
+  const destination = escapeHtml(route.destinationLabel.trim());
+  const header = [origin, destination].filter(Boolean).join(" → ");
+  if (header) parts.push(`<strong>${header}</strong>`);
   parts.push(`Distancia: ${formatDistance(route.distanceKm)}`);
   parts.push(`Duración: ${formatDuration(route.durationMinutes)}`);
   parts.push(`Índice: ${formatScore(route.score)}`);

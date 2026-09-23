@@ -6,9 +6,9 @@ import Button from "./Button";
 describe("Button", () => {
   it("renders its label and fires onClick", async () => {
     const onClick = vi.fn();
-    render(<Button onClick={onClick}>Analizar ruta</Button>);
+    render(<Button onClick={onClick}>Buscar ruta</Button>);
 
-    const button = screen.getByRole("button", { name: "Analizar ruta" });
+    const button = screen.getByRole("button", { name: "Buscar ruta" });
     await userEvent.click(button);
     expect(onClick).toHaveBeenCalledTimes(1);
   });
@@ -56,9 +56,9 @@ describe("Button", () => {
   });
 
   it("shows a spinner with aria-busy and keeps the action name while loading", () => {
-    render(<Button loading>Analizar ruta</Button>);
+    render(<Button loading>Buscar ruta</Button>);
 
-    const button = screen.getByRole("button", { name: "Analizar ruta" });
+    const button = screen.getByRole("button", { name: "Buscar ruta" });
     expect(button).toHaveAttribute("aria-busy", "true");
     expect(button).toBeDisabled();
     expect(button).toHaveTextContent("Cargando…");
@@ -69,10 +69,10 @@ describe("Button", () => {
   it("accepts a custom loading label", () => {
     render(
       <Button loading loadingLabel="Buscando…">
-        Analizar ruta
+        Buscar ruta
       </Button>,
     );
-    expect(screen.getByRole("button", { name: "Analizar ruta" })).toHaveTextContent(
+    expect(screen.getByRole("button", { name: "Buscar ruta" })).toHaveTextContent(
       "Buscando…",
     );
   });

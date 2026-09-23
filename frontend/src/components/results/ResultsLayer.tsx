@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { RouteCandidate } from "../../types";
 import Button from "../ui/Button";
 import ErrorState from "../ui/ErrorState";
@@ -15,7 +15,10 @@ export interface ResultsLayerProps {
   weatherAvailable: boolean;
   routeAvailable: boolean;
   selectedRouteId: number | null;
+  expandedRouteId: number | null;
   onSelectRoute: (routeIndex: number) => void;
+  onToggleExpand: (routeIndex: number) => void;
+  onCloseDetail: () => void;
   onRetry: () => void;
   onNewSearch: () => void;
   error?: string | null;
@@ -39,13 +42,14 @@ export default function ResultsLayer({
   weatherAvailable,
   routeAvailable,
   selectedRouteId,
+  expandedRouteId,
   onSelectRoute,
+  onToggleExpand,
+  onCloseDetail,
   onRetry,
   onNewSearch,
   error,
 }: ResultsLayerProps) {
-  const [expandedRouteId, setExpandedRouteId] = useState<number | null>(null);
-
   if (viewState === "idle") return null;
 
   if (viewState === "loading") return <LoadingState />;
@@ -79,15 +83,13 @@ export default function ResultsLayer({
                   isExpanded={expandedRouteId === index}
                   weatherAvailable={weatherAvailable}
                   onSelect={onSelectRoute}
-                  onToggleExpand={(routeIndex) =>
-                    setExpandedRouteId(expandedRouteId === routeIndex ? null : routeIndex)
-                  }
+                  onToggleExpand={onToggleExpand}
                 >
                   <RouteDetail
                     route={route}
                     index={index}
                     weatherAvailable={weatherAvailable}
-                    onClose={() => setExpandedRouteId(null)}
+                    onClose={onCloseDetail}
                   />
                 </RouteCard>
               </li>

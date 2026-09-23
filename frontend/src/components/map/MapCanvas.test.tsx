@@ -235,6 +235,52 @@ describe("MapCanvas", () => {
     expect(popup.html).toContain("B &quot;quote&quot;");
   });
 
+  it("keeps a single map instance when isCompact flips and only re-fits bounds", () => {
+    const { rerender } = render(
+      <MapCanvas routes={makeRoutes(1)} selectedRouteId={null} onSelectRoute={vi.fn()} isCompact={false} />,
+    );
+    const map = StubMap.instances.at(-1)!;
+    emitLoad(map);
+    expect(StubMap.instances).toHaveLength(1);
+    expect(map.fitBoundsCalls[0].options?.padding).toEqual(
+      expect.objectContaining({ top: 64, bottom: 64 }),
+    );
+
+    rerender(
+      <MapCanvas routes={makeRoutes(1)} selectedRouteId={null} onSelectRoute={vi.fn()} isCompact />,
+    );
+
+    expect(StubMap.instances).toHaveLength(1);
+    expect(StubMap.instances[0].removed).toBe(false);
+    expect(map.fitBoundsCalls).toHaveLength(2);
+    expect(map.fitBoundsCalls[1].options?.padding).toEqual(
+      expect.objectContaining({ top: 64, right: 24, bottom: 320, left: 24 }),
+    );
+  });
+
+  it("does not render a bare arrow in the popup when one label is empty", () => {
+    render(
+      <MapCanvas
+        routes={[route({ originLabel: "Solo origen", destinationLabel: "" })]}
+        selectedRouteId={null}
+        onSelectRoute={vi.fn()}
+      />,
+    );
+    const map = StubMap.instances.at(-1)!;
+    emitLoad(map);
+
+    act(() =>
+      map._emit("click", "route-lines", {
+        features: [{ properties: { routeIndex: 0 } }],
+        lngLat: [1.6, 42.55],
+      }),
+    );
+
+    const popup = StubPopup.instances.at(-1)!;
+    expect(popup.html).toContain("Solo origen");
+    expect(popup.html).not.toContain("→");
+  });
+
   it("cleans up the map on unmount", () => {
     const { unmount } = render(<MapCanvas routes={makeRoutes(1)} selectedRouteId={null} onSelectRoute={vi.fn()} />);
     const map = StubMap.instances.at(-1)!;

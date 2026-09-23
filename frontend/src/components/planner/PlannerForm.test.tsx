@@ -180,6 +180,18 @@ describe("PlannerForm", () => {
     expect(screen.getByRole("button", { name: "Buscar ruta" })).toBeEnabled();
   });
 
+  it("disables the submit button while the parent search is busy", () => {
+    const onSearch = vi.fn();
+    render(<PlannerForm onSearch={onSearch} busy />);
+
+    const submit = screen.getByRole("button", { name: "Buscar ruta" });
+    expect(submit).toBeDisabled();
+    expect(submit).toHaveAttribute("aria-busy", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Buscar ruta" }));
+    expect(onSearch).not.toHaveBeenCalled();
+  });
+
   it("validates required fields with the shared Spanish messages before resolving", async () => {
     const onSearch = vi.fn();
     render(<PlannerForm onSearch={onSearch} />);

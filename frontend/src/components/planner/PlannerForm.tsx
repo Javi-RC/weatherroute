@@ -25,6 +25,7 @@ export interface PlannerSearch {
 
 export interface PlannerFormProps {
   onSearch: (search: PlannerSearch) => void;
+  busy?: boolean;
 }
 
 const ACTIVITY_REQUIRED = "Actividad requerida";
@@ -74,7 +75,7 @@ function collectValidationErrors(error: z.ZodError): ValidationErrors {
   return errors;
 }
 
-export default function PlannerForm({ onSearch }: PlannerFormProps) {
+export default function PlannerForm({ onSearch, busy = false }: PlannerFormProps) {
   const fieldsRef = useRef<OriginDestinationFieldsHandle>(null);
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
@@ -111,7 +112,7 @@ export default function PlannerForm({ onSearch }: PlannerFormProps) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending) return;
+    if (pending || busy) return;
 
     setErrors({});
 
@@ -219,7 +220,7 @@ export default function PlannerForm({ onSearch }: PlannerFormProps) {
           </p>
         )}
       </div>
-      <Button type="submit" loading={pending} disabled={pending} className="w-full">
+      <Button type="submit" loading={pending || busy} disabled={pending || busy} className="w-full">
         Buscar ruta
       </Button>
     </form>

@@ -1,5 +1,5 @@
-import type { RiskLevel, RouteCandidate } from "../../types";
-import { buildRecommendation } from "../../i18n/recommendation";
+import type { RouteCandidate } from "../../types";
+import { buildRecommendation, findBestRouteIndex } from "../../i18n/recommendation";
 import { formatDistance, formatDuration } from "../../lib/format";
 import Badge from "../ui/Badge";
 import Button from "../ui/Button";
@@ -10,31 +10,10 @@ export interface BestRouteBannerProps {
   onNewSearch: () => void;
 }
 
-const SEVERITY: Record<RiskLevel, number> = {
-  Low: 0,
-  Moderate: 1,
-  High: 2,
-  Severe: 3,
-};
-
-function bestRouteIndex(routes: RouteCandidate[]): number {
-  let bestIndex = 0;
-  for (let i = 1; i < routes.length; i++) {
-    const current = routes[i];
-    const best = routes[bestIndex];
-    const better =
-      SEVERITY[current.riskLevel] < SEVERITY[best.riskLevel] ||
-      (SEVERITY[current.riskLevel] === SEVERITY[best.riskLevel] &&
-        current.distanceKm < best.distanceKm);
-    if (better) bestIndex = i;
-  }
-  return bestIndex;
-}
-
 export default function BestRouteBanner({ routes, onNewSearch }: BestRouteBannerProps) {
   if (routes.length === 0) return null;
 
-  const best = routes[bestRouteIndex(routes)];
+  const best = routes[findBestRouteIndex(routes)];
   const recommendation = buildRecommendation(routes);
 
   return (
