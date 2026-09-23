@@ -63,8 +63,18 @@ const ANALYSIS: RouteAnalysisResponse = {
   ],
 };
 
-function analysisResponse(): Response {
-  return new Response(JSON.stringify(ANALYSIS), { status: 200 });
+function analysisVariant(distanceKm: number): RouteAnalysisResponse {
+  return {
+    ...ANALYSIS,
+    routes: ANALYSIS.routes.map((route, index) =>
+      index === 1 ? { ...route, distanceKm } : route,
+    ),
+  };
+}
+
+function analysisResponse(distanceKm?: number): Response {
+  const body = distanceKm === undefined ? ANALYSIS : analysisVariant(distanceKm);
+  return new Response(JSON.stringify(body), { status: 200 });
 }
 
 function geocodeResponse(): Response {
@@ -74,7 +84,7 @@ function geocodeResponse(): Response {
   );
 }
 
-function mockFetch(analyzeImpl: () => Response) {
+function mockFetch(analyzeImpl: () => Response | Promise<Response>) {
   const calls = { analyze: 0, geocode: 0 };
   vi.stubGlobal(
     "fetch",
@@ -202,5 +212,162 @@ describe("App", () => {
 
     const card = document.querySelector('[data-route-card][data-route-index="0"]')!;
     expect(within(card as HTMLElement).getByRole("meter", { name: "Índice de condiciones" })).toBeInTheDocument();
+  });
+
+  it("auto-refreshes with a debounced re-analysis when only the activity changes, keeping results visible and replacing them atomically", async () => {
+    const user = userEvent.setup();
+    let servedFirst = false;
+    let resolveRefresh: (() => void) | undefined;
+    const calls = mockFetch(() => {
+      if (!servedFirst) {
+        servedFirst = true;
+        return analysisResponse();
+      }
+      return new Promise<Response>((resolve) => {
+        resolveRefresh = () => resolve(analysisResponse(21.4));
+      });
+    });
+    renderApp();
+
+    await typeAndSearch();
+    await screen.findByText("Recomendada");
+    expect(screen.queryByText("Actualizando…")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Coche" }));
+    await user.click(screen.getByRole("button", { name: "Buscar ruta" }));
+
+    // debounced: exactly one new analyze request, previous results stay visible
+    await waitFor(() => expect(calls.analyze).toBe(2));
+    expect(screen.getByText("Actualizando…")).toBeInTheDocument();
+    expect(screen.getByText("Ruta 1")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveRefresh?.();
+    });
+    await waitFor(() => expect(screen.queryByText("Actualizando…")).not.toBeInTheDocument());
+    expect(screen.getByText("21,4 km")).toBeInTheDocument();
+    expect(calls.analyze).toBe(2);
+  });
+
+  it("never fires a second auto-refresh while a refresh mutation is pending", async () => {
+    const user = userEvent.setup();
+    let servedFirst = false;
+    let resolveRefresh: (() => void) | undefined;
+    const calls = mockFetch(() => {
+      if (!servedFirst) {
+        servedFirst = true;
+        return analysisResponse();
+      }
+      return new Promise<Response>((resolve) => {
+        resolveRefresh = () => resolve(analysisResponse(21.4));
+      });
+    });
+    renderApp();
+
+    await typeAndSearch();
+    await screen.findByText("Recomendada");
+    expect(calls.analyze).toBe(1);
+
+    await user.click(screen.getByRole("button", { name: "Coche" }));
+    await user.click(screen.getByRole("button", { name: "Buscar ruta" }));
+    await waitFor(() => expect(calls.analyze).toBe(2));
+    expect(screen.getByText("Actualizando…")).toBeInTheDocument();
+
+    // change the activity again and resubmit while the refresh is pending
+    await user.click(screen.getByRole("button", { name: "Moto" }));
+    await user.click(screen.getByRole("button", { name: "Buscar ruta" }));
+
+    // the debounce (~400ms) fires and the pending guard drops the request
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    expect(calls.analyze).toBe(2);
+
+    await act(async () => {
+      resolveRefresh?.();
+    });
+    await waitFor(() => expect(screen.queryByText("Actualizando…")).not.toBeInTheDocument());
+    expect(screen.getByText("21,4 km")).toBeInTheDocument();
+  });
+
+  it("treats an origin/destination text change as a new full search, not an auto-refresh", async () => {
+    const user = userEvent.setup();
+    let servedFirst = false;
+    let resolveSecond: (() => void) | undefined;
+    const calls = mockFetch(() => {
+      if (!servedFirst) {
+        servedFirst = true;
+        return analysisResponse();
+      }
+      return new Promise<Response>((resolve) => {
+        resolveSecond = () => resolve(analysisResponse());
+      });
+    });
+    renderApp();
+
+    await typeAndSearch();
+    await screen.findByText("Recomendada");
+    expect(calls.analyze).toBe(1);
+
+    await user.type(screen.getByLabelText(/desde/i), " X");
+    await user.click(screen.getByRole("button", { name: "Buscar ruta" }));
+
+    // full search: loading replaces results and no incremental indicator shows
+    await waitFor(() => expect(calls.analyze).toBe(2));
+    expect(screen.queryByText("Actualizando…")).not.toBeInTheDocument();
+    expect(screen.queryByText("Recomendada")).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveSecond?.();
+    });
+    await screen.findByText("Recomendada");
+    expect(calls.analyze).toBe(2);
+  });
+
+  it("ignores a stale auto-refresh result that resolves after a new full search started", async () => {
+    const user = userEvent.setup();
+    let servedFirst = false;
+    let resolveRefresh: (() => void) | undefined;
+    let resolveFull: (() => void) | undefined;
+    const calls = mockFetch(() => {
+      if (!servedFirst) {
+        servedFirst = true;
+        return analysisResponse();
+      }
+      if (calls.analyze === 2) {
+        return new Promise<Response>((resolve) => {
+          resolveRefresh = () => resolve(analysisResponse(21.4));
+        });
+      }
+      return new Promise<Response>((resolve) => {
+        resolveFull = () => resolve(analysisResponse(9.3));
+      });
+    });
+    renderApp();
+
+    await typeAndSearch();
+    await screen.findByText("Recomendada");
+    expect(calls.analyze).toBe(1);
+
+    await user.click(screen.getByRole("button", { name: "Coche" }));
+    await user.click(screen.getByRole("button", { name: "Buscar ruta" }));
+    await waitFor(() => expect(calls.analyze).toBe(2));
+    expect(screen.getByText("Actualizando…")).toBeInTheDocument();
+
+    // a new full search starts while the refresh is still pending
+    await user.type(screen.getByLabelText(/desde/i), " X");
+    await user.click(screen.getByRole("button", { name: "Buscar ruta" }));
+    await waitFor(() => expect(calls.analyze).toBe(3));
+    expect(screen.queryByText("Actualizando…")).not.toBeInTheDocument();
+
+    // the stale refresh resolving first must not replace the loading full search
+    await act(async () => {
+      resolveRefresh?.();
+    });
+    expect(screen.queryByText("Recomendada")).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveFull?.();
+    });
+    await screen.findByText("Recomendada");
+    expect(screen.getByText("9,3 km")).toBeInTheDocument();
   });
 });
