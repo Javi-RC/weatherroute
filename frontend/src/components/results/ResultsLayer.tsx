@@ -21,6 +21,7 @@ export interface ResultsLayerProps {
   onCloseDetail: () => void;
   onRetry: () => void;
   onNewSearch: () => void;
+  onHowCalculated?: () => void;
   error?: string | null;
 }
 
@@ -48,6 +49,7 @@ export default function ResultsLayer({
   onCloseDetail,
   onRetry,
   onNewSearch,
+  onHowCalculated,
   error,
 }: ResultsLayerProps) {
   if (viewState === "idle") return null;
@@ -90,6 +92,7 @@ export default function ResultsLayer({
                     index={index}
                     weatherAvailable={weatherAvailable}
                     onClose={onCloseDetail}
+                    onHowCalculated={onHowCalculated}
                   />
                 </RouteCard>
               </li>

@@ -537,6 +537,28 @@ describe("App", () => {
     expect(history[0].savedAt).not.toBe("2026-09-22T08:00:00.000Z");
   });
 
+  it("opens the About modal from the header", async () => {
+    renderApp();
+
+    await userEvent.click(screen.getByRole("button", { name: "Cómo funciona" }));
+
+    expect(screen.getByRole("dialog", { name: "Cómo funciona" })).toBeInTheDocument();
+  });
+
+  it("opens the About modal focused on the score section from ¿Cómo se calcula?", async () => {
+    mockFetch(() => analysisResponse());
+    renderApp();
+
+    await typeAndSearch();
+    await screen.findByText("Recomendada");
+    await userEvent.click(screen.getAllByRole("button", { name: "Ampliar ruta" })[0]);
+
+    await userEvent.click(screen.getAllByRole("button", { name: "¿Cómo se calcula?" })[0]);
+
+    expect(screen.getByRole("dialog", { name: "Cómo funciona" })).toBeInTheDocument();
+    expect(document.activeElement).toBe(document.getElementById("about-score"));
+  });
+
   it("deletes a history entry from the sheet", async () => {
     mockFetch(() => analysisResponse());
     renderApp();

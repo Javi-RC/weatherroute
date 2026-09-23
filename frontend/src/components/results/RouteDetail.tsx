@@ -11,6 +11,7 @@ export interface RouteDetailProps {
   weatherAvailable: boolean;
   isCompact?: boolean;
   onClose?: () => void;
+  onHowCalculated?: () => void;
 }
 
 const MOBILE_BREAKPOINT = "(min-width: 768px)";
@@ -39,14 +40,15 @@ export default function RouteDetail({
   weatherAvailable,
   isCompact,
   onClose,
+  onHowCalculated,
 }: RouteDetailProps) {
   const compact = isCompact ?? !useMediaQuery(MOBILE_BREAKPOINT);
 
   const content = (
     <div className="space-y-5">
       <div className="grid gap-5 md:grid-cols-2">
-        <ScoreGauge score={route.riskScore} />
-        <FactorList factors={route.factors} />
+        <ScoreGauge score={route.riskScore} onHowCalculated={onHowCalculated} />
+        <FactorList factors={route.factors} onHowCalculated={onHowCalculated} />
       </div>
       {!weatherAvailable && (
         <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">

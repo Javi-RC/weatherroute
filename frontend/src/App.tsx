@@ -1,5 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
+import AboutModal, { type AboutSection } from "./components/about/AboutModal";
 import HistorySheet from "./components/history/HistorySheet";
 import MapCanvas from "./components/map/MapCanvas";
 import MapLegend from "./components/map/MapLegend";
@@ -68,6 +69,8 @@ function AppContent() {
   const [last, setLast] = useState<AnalyzeRequest | null>(null);
   const history = useRecentSearches();
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [aboutSection, setAboutSection] = useState<AboutSection | null>(null);
   const [selectedRouteId, setSelectedRouteId] = useState<number | null>(null);
   const [expandedRouteId, setExpandedRouteId] = useState<number | null>(null);
   const [originLabel, setOriginLabel] = useState("");
@@ -251,10 +254,16 @@ function AppContent() {
     setExpandedRouteId((current) => (current === index ? null : index));
   }
 
+  function openAbout(section?: AboutSection) {
+    setAboutSection(section ?? null);
+    setAboutOpen(true);
+  }
+
   return (
     <>
       <AppShell
         isCompact={isCompact}
+        onOpenAbout={() => openAbout()}
         onOpenHistory={() => setHistoryOpen(true)}
         plannerSlot={<PlannerSheet busy={status === "loading"} onSearch={handleSearch} isCompact={isCompact} />}
         resultsSlot={
@@ -272,6 +281,7 @@ function AppContent() {
               onCloseDetail={() => setExpandedRouteId(null)}
               onRetry={handleRetry}
               onNewSearch={handleNewSearch}
+              onHowCalculated={() => openAbout("score")}
               error={status === "error" ? ERROR_MESSAGE : null}
             />
           </div>
@@ -302,6 +312,7 @@ function AppContent() {
         onRun={handleRunHistory}
         onRemove={history.remove}
       />
+      <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} focusSection={aboutSection} />
     </>
   );
 }
