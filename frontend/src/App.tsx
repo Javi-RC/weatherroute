@@ -12,12 +12,16 @@ import { useMediaQuery } from "./lib/useMediaQuery";
 import type { GeoPoint, LngLat, MapRouteInput } from "./lib/map";
 import AppShell from "./layouts/AppShell";
 import { useDebouncedCallback } from "./hooks/useDebouncedCallback";
+import { ToastProvider, useToasts } from "./hooks/useToasts";
 import { analyzeRoute } from "./services/api";
 import type { AnalyzeRequest, RouteAnalysisResponse, RouteCandidate } from "./types";
 
 type AppStatus = "idle" | "loading" | "error" | "full" | "partial";
 
 const ERROR_MESSAGE = "No se pudo calcular la ruta. Revisa tu conexión e inténtalo de nuevo.";
+const REFRESH_ERROR_MESSAGE = "No se pudo actualizar la ruta. Se conservan los resultados anteriores.";
+const WEATHER_UNAVAILABLE_TOAST = "No hay previsión meteorológica para esa fecha. Mostramos distancia y duración.";
+const ROUTE_UNAVAILABLE_TOAST = "El servicio de rutas está temporalmente no disponible.";
 
 const DESKTOP_QUERY = "(min-width: 1024px)";
 
@@ -43,6 +47,18 @@ function toMapRouteInput(
 }
 
 export default function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
+  );
+}
+
+function AppContent() {
+  const { addToast } = useToasts();
+  // Task 21: "Usar mi ubicación" geolocation failures belong to the
+  // geolocation component (OriginDestinationFields); wire them to a toast with:
+  //   addToast("error", "No pudimos obtener tu ubicación. Revisa los permisos del navegador.")
   const [status, setStatus] = useState<AppStatus>("idle");
   const [result, setResult] = useState<RouteAnalysisResponse | null>(null);
   const [last, setLast] = useState<AnalyzeRequest | null>(null);
@@ -66,6 +82,13 @@ export default function App() {
       // Task 18: persist/refresh the history entry with the new analysis here
       setResult(data);
       setStatus(data.status);
+      if (data.status === "partial") {
+        if (!data.weatherAvailable) {
+          addToast("info", WEATHER_UNAVAILABLE_TOAST);
+        } else if (!data.routeAvailable) {
+          addToast("info", ROUTE_UNAVAILABLE_TOAST);
+        }
+      }
       if (!intent.isRefresh) {
         setSelectedRouteId(data.routes.length > 0 ? findBestRouteIndex(data.routes) : null);
       }
@@ -76,6 +99,7 @@ export default function App() {
       if (!intent || intent.request !== variables) return;
       if (intent.isRefresh) {
         setRefreshing(false);
+        addToast("error", REFRESH_ERROR_MESSAGE);
         return;
       }
       setStatus("error");
@@ -92,6 +116,7 @@ export default function App() {
       mutation.mutate(request);
     } catch {
       setRefreshing(false);
+      addToast("error", REFRESH_ERROR_MESSAGE);
     }
   });
 

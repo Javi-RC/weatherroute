@@ -424,4 +424,51 @@ describe("App", () => {
     expect(calls.analyze).toBe(1);
     expect(screen.queryByText("Actualizando…")).not.toBeInTheDocument();
   });
+
+  it("keeps the previous results and shows an error toast when an auto-refresh fails", async () => {
+    const user = userEvent.setup();
+    let servedFirst = false;
+    const calls = mockFetch(() => {
+      if (!servedFirst) {
+        servedFirst = true;
+        return analysisResponse();
+      }
+      return new Response(null, { status: 503 });
+    });
+    renderApp();
+
+    await typeAndSearch();
+    await screen.findByText("Recomendada");
+    expect(calls.analyze).toBe(1);
+
+    await user.click(screen.getByRole("button", { name: "Coche" }));
+    await user.click(screen.getByRole("button", { name: "Buscar ruta" }));
+    await waitFor(() => expect(calls.analyze).toBe(2));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("No se pudo actualizar la ruta");
+    expect(screen.getByText("Ruta 1")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("Actualizando…")).not.toBeInTheDocument());
+    expect(calls.analyze).toBe(2);
+  });
+
+  it("shows an info toast when the analysis is partial and weather is unavailable", async () => {
+    mockFetch(() =>
+      new Response(
+        JSON.stringify({ ...ANALYSIS, status: "partial", weatherAvailable: false }),
+        { status: 200 },
+      ),
+    );
+    renderApp();
+
+    await typeAndSearch();
+
+    const statuses = await screen.findAllByRole("status");
+    expect(
+      statuses.some((element) =>
+        element.textContent?.includes("Mostramos distancia y duración"),
+      ),
+    ).toBe(true);
+    expect(screen.getByText("Recomendada")).toBeInTheDocument();
+  });
 });
