@@ -77,6 +77,7 @@ export default function AdvancedOptions({
     const parsed = Number(next);
     if (!Number.isInteger(parsed) || parsed < DURATION_MIN || parsed > DURATION_MAX) {
       setDurationError(DURATION_ERROR);
+      onDurationMaxChange?.(null);
       return;
     }
     setDurationError(undefined);

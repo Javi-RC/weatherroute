@@ -92,14 +92,17 @@ describe("AdvancedOptions", () => {
     await user.type(durationInput, "0");
     expect(screen.getByText("Entre 1 y 1440 minutos")).toBeInTheDocument();
     expect(onDurationMaxChange).not.toHaveBeenCalledWith(0);
+    expect(onDurationMaxChange).toHaveBeenLastCalledWith(null);
 
     await user.clear(durationInput);
+    expect(onDurationMaxChange).toHaveBeenLastCalledWith(null);
+
     await user.type(durationInput, "120");
     expect(onDurationMaxChange).toHaveBeenLastCalledWith(120);
     expect(screen.queryByText("Entre 1 y 1440 minutos")).not.toBeInTheDocument();
   });
 
-  it("rejects values above 1440", async () => {
+  it("rejects values above 1440 and clears the parent-visible value", async () => {
     const user = userEvent.setup();
     const onDurationMaxChange = vi.fn();
     render(
@@ -113,6 +116,7 @@ describe("AdvancedOptions", () => {
     await user.type(screen.getByLabelText("Duración máx. (min)"), "2000");
     expect(screen.getByText("Entre 1 y 1440 minutos")).toBeInTheDocument();
     expect(onDurationMaxChange).not.toHaveBeenCalledWith(2000);
+    expect(onDurationMaxChange).toHaveBeenLastCalledWith(null);
   });
 
   it("clearing the duration emits null", async () => {
