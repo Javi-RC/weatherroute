@@ -370,4 +370,58 @@ describe("App", () => {
     await screen.findByText("Recomendada");
     expect(screen.getByText("9,3 km")).toBeInTheDocument();
   });
+
+  it("preserves the user-selected route across an auto-refresh result", async () => {
+    const user = userEvent.setup();
+    let servedFirst = false;
+    let resolveRefresh: (() => void) | undefined;
+    const calls = mockFetch(() => {
+      if (!servedFirst) {
+        servedFirst = true;
+        return analysisResponse();
+      }
+      return new Promise<Response>((resolve) => {
+        resolveRefresh = () => resolve(analysisResponse(21.4));
+      });
+    });
+    renderApp();
+
+    await typeAndSearch();
+    await screen.findByText("Recomendada");
+
+    await user.click(screen.getByRole("button", { name: /Ruta 2/ }));
+    const card = (index: number) =>
+      document.querySelector(`[data-route-card][data-route-index="${index}"]`) as HTMLElement;
+    expect(card(1)).toHaveAttribute("data-selected", "true");
+    expect(card(0)).toHaveAttribute("data-selected", "false");
+
+    await user.click(screen.getByRole("button", { name: "Coche" }));
+    await user.click(screen.getByRole("button", { name: "Buscar ruta" }));
+    await waitFor(() => expect(calls.analyze).toBe(2));
+    expect(screen.getByText("Actualizando…")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveRefresh?.();
+    });
+    await waitFor(() => expect(screen.queryByText("Actualizando…")).not.toBeInTheDocument());
+
+    expect(card(1)).toHaveAttribute("data-selected", "true");
+    expect(card(0)).toHaveAttribute("data-selected", "false");
+  });
+
+  it("skips a refresh when the resubmitted search is unchanged", async () => {
+    const user = userEvent.setup();
+    const calls = mockFetch(() => analysisResponse());
+    renderApp();
+
+    await typeAndSearch();
+    await screen.findByText("Recomendada");
+    expect(calls.analyze).toBe(1);
+
+    await user.click(screen.getByRole("button", { name: "Buscar ruta" }));
+    await new Promise((resolve) => setTimeout(resolve, 700));
+
+    expect(calls.analyze).toBe(1);
+    expect(screen.queryByText("Actualizando…")).not.toBeInTheDocument();
+  });
 });

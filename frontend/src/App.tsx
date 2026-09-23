@@ -61,15 +61,20 @@ export default function App() {
   const mutation = useMutation({
     mutationFn: analyzeRoute,
     onSuccess: (data, variables) => {
-      if (intentRef.current?.request !== variables) return;
+      const intent = intentRef.current;
+      if (!intent || intent.request !== variables) return;
+      // Task 18: persist/refresh the history entry with the new analysis here
       setResult(data);
       setStatus(data.status);
-      setSelectedRouteId(data.routes.length > 0 ? findBestRouteIndex(data.routes) : null);
+      if (!intent.isRefresh) {
+        setSelectedRouteId(data.routes.length > 0 ? findBestRouteIndex(data.routes) : null);
+      }
       setRefreshing(false);
     },
     onError: (_error, variables) => {
-      if (intentRef.current?.request !== variables) return;
-      if (intentRef.current.isRefresh) {
+      const intent = intentRef.current;
+      if (!intent || intent.request !== variables) return;
+      if (intent.isRefresh) {
         setRefreshing(false);
         return;
       }
@@ -121,9 +126,16 @@ export default function App() {
       search.destinationPoint.longitude === destinationPoint.longitude;
 
     if (samePlaces) {
-      refreshRequestRef.current = request;
-      setLast(request);
-      scheduleRefresh();
+      const unchanged =
+        last !== null &&
+        request.activity === last.activity &&
+        request.departureTime === last.departureTime &&
+        request.maxDurationMinutes === last.maxDurationMinutes;
+      if (!unchanged) {
+        refreshRequestRef.current = request;
+        setLast(request);
+        scheduleRefresh();
+      }
       return;
     }
 
