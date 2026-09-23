@@ -1,5 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
+import HistorySheet from "./components/history/HistorySheet";
 import MapCanvas from "./components/map/MapCanvas";
 import MapLegend from "./components/map/MapLegend";
 import PlannerSheet from "./components/planner/PlannerSheet";
@@ -9,7 +10,10 @@ import ResultsLayer from "./components/results/ResultsLayer";
 import EmptyState from "./components/ui/EmptyState";
 import { findBestRouteIndex } from "./i18n/recommendation";
 import { useMediaQuery } from "./lib/useMediaQuery";
+import { resolvePlace } from "./lib/places";
 import type { GeoPoint, LngLat, MapRouteInput } from "./lib/map";
+import { useRecentSearches } from "./hooks/useRecentSearches";
+import type { HistoryEntry } from "./lib/storage";
 import AppShell from "./layouts/AppShell";
 import { useDebouncedCallback } from "./hooks/useDebouncedCallback";
 import { ToastProvider, useToasts } from "./hooks/useToasts";
@@ -62,6 +66,8 @@ function AppContent() {
   const [status, setStatus] = useState<AppStatus>("idle");
   const [result, setResult] = useState<RouteAnalysisResponse | null>(null);
   const [last, setLast] = useState<AnalyzeRequest | null>(null);
+  const history = useRecentSearches();
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedRouteId, setSelectedRouteId] = useState<number | null>(null);
   const [expandedRouteId, setExpandedRouteId] = useState<number | null>(null);
   const [originLabel, setOriginLabel] = useState("");
@@ -79,7 +85,13 @@ function AppContent() {
     onSuccess: (data, variables) => {
       const intent = intentRef.current;
       if (!intent || intent.request !== variables) return;
-      // Task 18: persist/refresh the history entry with the new analysis here
+      history.save({
+        origin: intent.request.origin,
+        destination: intent.request.destination,
+        activity: intent.request.activity,
+        departureTimeUtc: intent.request.departureTime,
+        maxDurationMinutes: intent.request.maxDurationMinutes ?? null,
+      });
       setResult(data);
       setStatus(data.status);
       if (data.status === "partial") {
@@ -197,6 +209,29 @@ function AppContent() {
     }
   }
 
+  async function handleRunHistory(entry: HistoryEntry) {
+    setHistoryOpen(false);
+    const [originResult, destinationResult] = await Promise.allSettled([
+      resolvePlace(entry.origin),
+      resolvePlace(entry.destination),
+    ]);
+    const origin = originResult.status === "fulfilled" ? originResult.value : null;
+    const destination = destinationResult.status === "fulfilled" ? destinationResult.value : null;
+    if (origin === null || destination === null) {
+      addToast("error", "No pudimos repetir esa búsqueda. Revisa las ubicaciones guardadas.");
+      return;
+    }
+    handleSearch({
+      origin: origin.label,
+      destination: destination.label,
+      originPoint: { latitude: origin.lat, longitude: origin.lon },
+      destinationPoint: { latitude: destination.lat, longitude: destination.lon },
+      activity: entry.activity,
+      departureTime: entry.departureTimeUtc,
+      maxDurationMinutes: entry.maxDurationMinutes,
+    });
+  }
+
   function handleNewSearch() {
     intentRef.current = null;
     refreshRequestRef.current = null;
@@ -217,46 +252,56 @@ function AppContent() {
   }
 
   return (
-    <AppShell
-      isCompact={isCompact}
-      plannerSlot={<PlannerSheet busy={status === "loading"} onSearch={handleSearch} isCompact={isCompact} />}
-      resultsSlot={
-        <div className="flex flex-col gap-3">
-          <RefreshingIndicator visible={refreshing} />
-          <ResultsLayer
-            viewState={status}
-            routes={result?.routes ?? []}
-            weatherAvailable={result?.weatherAvailable ?? true}
-            routeAvailable={result?.routeAvailable ?? true}
-            selectedRouteId={selectedRouteId}
-            expandedRouteId={expandedRouteId}
-            onSelectRoute={setSelectedRouteId}
-            onToggleExpand={handleToggleExpand}
-            onCloseDetail={() => setExpandedRouteId(null)}
-            onRetry={handleRetry}
-            onNewSearch={handleNewSearch}
-            error={status === "error" ? ERROR_MESSAGE : null}
-          />
-        </div>
-      }
-      welcomeSlot={
-        status === "idle" ? (
-          <EmptyState
-            title="Tu ruta, con el clima en cuenta"
-            description="Introduce el origen y el destino, elige tu actividad y compara las rutas según la previsión meteorológica."
-          />
-        ) : undefined
-      }
-      legendSlot={<MapLegend />}
-    >
-      <MapCanvas
-        routes={mapRoutes}
-        selectedRouteId={selectedRouteId}
-        onSelectRoute={setSelectedRouteId}
-        originPoint={originPoint ?? undefined}
-        destinationPoint={destinationPoint ?? undefined}
+    <>
+      <AppShell
         isCompact={isCompact}
+        onOpenHistory={() => setHistoryOpen(true)}
+        plannerSlot={<PlannerSheet busy={status === "loading"} onSearch={handleSearch} isCompact={isCompact} />}
+        resultsSlot={
+          <div className="flex flex-col gap-3">
+            <RefreshingIndicator visible={refreshing} />
+            <ResultsLayer
+              viewState={status}
+              routes={result?.routes ?? []}
+              weatherAvailable={result?.weatherAvailable ?? true}
+              routeAvailable={result?.routeAvailable ?? true}
+              selectedRouteId={selectedRouteId}
+              expandedRouteId={expandedRouteId}
+              onSelectRoute={setSelectedRouteId}
+              onToggleExpand={handleToggleExpand}
+              onCloseDetail={() => setExpandedRouteId(null)}
+              onRetry={handleRetry}
+              onNewSearch={handleNewSearch}
+              error={status === "error" ? ERROR_MESSAGE : null}
+            />
+          </div>
+        }
+        welcomeSlot={
+          status === "idle" ? (
+            <EmptyState
+              title="Tu ruta, con el clima en cuenta"
+              description="Introduce el origen y el destino, elige tu actividad y compara las rutas según la previsión meteorológica."
+            />
+          ) : undefined
+        }
+        legendSlot={<MapLegend />}
+      >
+        <MapCanvas
+          routes={mapRoutes}
+          selectedRouteId={selectedRouteId}
+          onSelectRoute={setSelectedRouteId}
+          originPoint={originPoint ?? undefined}
+          destinationPoint={destinationPoint ?? undefined}
+          isCompact={isCompact}
+        />
+      </AppShell>
+      <HistorySheet
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        entries={history.entries}
+        onRun={handleRunHistory}
+        onRemove={history.remove}
       />
-    </AppShell>
+    </>
   );
 }

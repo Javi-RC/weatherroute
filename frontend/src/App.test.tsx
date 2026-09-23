@@ -141,11 +141,13 @@ beforeEach(() => {
   StubMap.reset();
   StubMarker.reset();
   stubDesktopMedia();
+  window.localStorage.clear();
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  window.localStorage.clear();
 });
 
 describe("App", () => {
@@ -470,5 +472,84 @@ describe("App", () => {
       ),
     ).toBe(true);
     expect(screen.getByText("Recomendada")).toBeInTheDocument();
+  });
+
+  it("saves a history entry after a successful analysis and opens it from the header", async () => {
+    mockFetch(() => analysisResponse());
+    renderApp();
+
+    await typeAndSearch();
+    await screen.findByText("Recomendada");
+
+    const raw = window.localStorage.getItem("weatherroute:history");
+    expect(raw).toBeTruthy();
+    const history = JSON.parse(raw!);
+    expect(history).toHaveLength(1);
+    expect(history[0].origin).toBe("Ciudad Real");
+    expect(history[0].destination).toBe("Almagro");
+    expect(history[0].activity).toBe("Cycling");
+
+    await userEvent.click(screen.getByRole("button", { name: "Historial" }));
+    expect(screen.getByRole("dialog", { name: "Historial" })).toBeInTheDocument();
+    expect(screen.getByText("Ciudad Real → Almagro")).toBeInTheDocument();
+  });
+
+  it("does not persist history on a failed analysis", async () => {
+    mockFetch(() => new Response(null, { status: 503 }));
+    renderApp();
+
+    await typeAndSearch();
+    await screen.findByRole("alert");
+
+    expect(window.localStorage.getItem("weatherroute:history")).toBeNull();
+  });
+
+  it("re-runs a saved search from history and dedupes the entry", async () => {
+    const calls = mockFetch(() => analysisResponse());
+    window.localStorage.setItem(
+      "weatherroute:history",
+      JSON.stringify([
+        {
+          id: "seeded",
+          origin: "Ciudad Real",
+          destination: "Almagro",
+          activity: "Cycling",
+          departureTimeUtc: "2026-09-22T10:00:00.000Z",
+          maxDurationMinutes: null,
+          savedAt: "2026-09-22T08:00:00.000Z",
+        },
+      ]),
+    );
+    renderApp();
+
+    await userEvent.click(screen.getByRole("button", { name: "Historial" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Repetir búsqueda de Ciudad Real a Almagro" }),
+    );
+
+    await waitFor(() => expect(calls.analyze).toBe(1));
+    await waitFor(() => expect(calls.geocode).toBe(2));
+    await screen.findByText("Recomendada");
+
+    const history = JSON.parse(window.localStorage.getItem("weatherroute:history")!);
+    expect(history).toHaveLength(1);
+    expect(history[0].origin).toBe("Ciudad Real");
+    expect(history[0].savedAt).not.toBe("2026-09-22T08:00:00.000Z");
+  });
+
+  it("deletes a history entry from the sheet", async () => {
+    mockFetch(() => analysisResponse());
+    renderApp();
+
+    await typeAndSearch();
+    await screen.findByText("Recomendada");
+
+    await userEvent.click(screen.getByRole("button", { name: "Historial" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Eliminar búsqueda de Ciudad Real a Almagro" }),
+    );
+
+    expect(screen.getByText("Aún no hay búsquedas guardadas")).toBeInTheDocument();
+    expect(window.localStorage.getItem("weatherroute:history")).toBe("[]");
   });
 });
