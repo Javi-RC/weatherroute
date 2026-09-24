@@ -43,6 +43,28 @@ public static class RouteEndpoints
             return Results.Ok(new { query = q, coordinates = new { lat = coord.Latitude, lon = coord.Longitude } });
         });
 
+        group.MapGet("/geocode/search", async (
+            [FromQuery] string? q,
+            IGeocodingDiscoveryProvider discovery,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(q)) return Results.BadRequest(new { error = "Missing q." });
+            var candidates = await discovery.SearchAsync(q, ct);
+            return Results.Ok(new { query = q, candidates });
+        });
+
+        group.MapGet("/geocode/reverse", async (
+            [FromQuery] double? lat,
+            [FromQuery] double? lon,
+            IGeocodingDiscoveryProvider discovery,
+            CancellationToken ct) =>
+        {
+            if (lat is null || lon is null || lat < -90 || lat > 90 || lon < -180 || lon > 180)
+                return Results.BadRequest(new { error = "Invalid or missing lat/lon." });
+            var label = await discovery.GetPlaceNameAsync(lat.Value, lon.Value, ct);
+            return Results.Ok(new { label });
+        });
+
         group.MapPost("/routes/analyses", async (
             SaveAnalysisRequest request,
             IGeocodingProvider geocoding,

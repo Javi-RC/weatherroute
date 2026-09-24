@@ -44,6 +44,11 @@ builder.Services.AddSingleton<IRouteProvider>(sp =>
     var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OpenRouteServiceOptions>>().Value;
     return new OpenRouteServiceRoutingAdapter(sp.GetRequiredService<IHttpClientFactory>().CreateClient("ors"), options);
 });
+builder.Services.AddSingleton<IGeocodingDiscoveryProvider>(sp =>
+{
+    var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OpenRouteServiceOptions>>().Value;
+    return new OpenRouteServiceRoutingAdapter(sp.GetRequiredService<IHttpClientFactory>().CreateClient("ors"), options);
+});
 builder.Services.AddTransient<IWeatherProvider>(sp =>
 {
     var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient("open-meteo");
