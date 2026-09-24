@@ -1,5 +1,10 @@
 # WeatherRoute UX/UI Redesign — Implementation Plan
 
+**Estado: completado (2026-09-24).** Tasks 1–23 done on branch
+`ux-redesign`; coverage map in Task 23 confirmed against spec §10. Docker
+wasn't available for a live smoke test or the `Category=Integration` gate in
+this run — both are recommended before/at merge time.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: use superpowers:subagent-driven-development
 > (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 > Steps use checkbox (`- [ ]`) syntax for tracking.
