@@ -88,7 +88,7 @@ export default function Sheet({
         aria-hidden="true"
         onClick={handleBackdropClick}
         className={[
-          "absolute inset-0 bg-sand-950/50 transition-opacity motion-safe:duration-300",
+          "absolute inset-0 bg-sand-950/50 motion-safe:transition-opacity motion-safe:duration-300",
           visible ? "opacity-100" : "opacity-0",
         ].join(" ")}
       />

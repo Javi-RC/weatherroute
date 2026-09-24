@@ -77,6 +77,20 @@ describe("Button", () => {
     );
   });
 
+  it("keeps every size at or above the 44px touch-target minimum", () => {
+    render(
+      <>
+        <Button size="sm">Pequeño</Button>
+        <Button size="md">Medio</Button>
+        <Button size="lg">Grande</Button>
+      </>,
+    );
+
+    expect(screen.getByRole("button", { name: "Pequeño" })).toHaveClass("min-h-11");
+    expect(screen.getByRole("button", { name: "Medio" })).toHaveClass("min-h-11");
+    expect(screen.getByRole("button", { name: "Grande" })).toHaveClass("min-h-11");
+  });
+
   it("does not set aria-busy when resting", () => {
     render(<Button>Reposo</Button>);
     const button = screen.getByRole("button", { name: "Reposo" });

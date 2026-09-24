@@ -57,7 +57,7 @@ export default function RouteCard({
       data-route-index={index}
       data-selected={isSelected}
       className={[
-        "transition-shadow",
+        "motion-safe:transition-shadow",
         isSelected ? "ring-2 ring-ocean-600" : "hover:ring-1 hover:ring-ocean-300",
       ].join(" ")}
     >

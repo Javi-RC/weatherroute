@@ -56,7 +56,7 @@ export default function ScoreGauge({ score, onHowCalculated, className }: ScoreG
         aria-label="Índice de condiciones"
         className="h-2.5 w-full overflow-hidden rounded-full bg-sand-200"
       >
-        <div className={["h-full rounded-full transition-[width]", fill].join(" ")} style={{ width: `${now}%` }} />
+        <div className={["h-full rounded-full motion-safe:transition-[width]", fill].join(" ")} style={{ width: `${now}%` }} />
       </div>
       <p className="text-xs text-sand-500">{CONDITIONS_NOTE}</p>
     </div>
