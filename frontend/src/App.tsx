@@ -27,6 +27,7 @@ const ERROR_MESSAGE = "No se pudo calcular la ruta. Revisa tu conexión e intén
 const REFRESH_ERROR_MESSAGE = "No se pudo actualizar la ruta. Se conservan los resultados anteriores.";
 const WEATHER_UNAVAILABLE_TOAST = "No hay previsión meteorológica para esa fecha. Mostramos distancia y duración.";
 const ROUTE_UNAVAILABLE_TOAST = "El servicio de rutas está temporalmente no disponible.";
+const LOCATION_ERROR_MESSAGE = "No pudimos obtener tu ubicación. Revisa los permisos del navegador.";
 
 const DESKTOP_QUERY = "(min-width: 1024px)";
 
@@ -61,9 +62,6 @@ export default function App() {
 
 function AppContent() {
   const { addToast } = useToasts();
-  // Task 21: "Usar mi ubicación" geolocation failures belong to the
-  // geolocation component (OriginDestinationFields); wire them to a toast with:
-  //   addToast("error", "No pudimos obtener tu ubicación. Revisa los permisos del navegador.")
   const [status, setStatus] = useState<AppStatus>("idle");
   const [result, setResult] = useState<RouteAnalysisResponse | null>(null);
   const [last, setLast] = useState<AnalyzeRequest | null>(null);
@@ -254,6 +252,10 @@ function AppContent() {
     setExpandedRouteId((current) => (current === index ? null : index));
   }
 
+  function handleLocationError() {
+    addToast("error", LOCATION_ERROR_MESSAGE);
+  }
+
   function openAbout(section?: AboutSection) {
     setAboutSection(section ?? null);
     setAboutOpen(true);
@@ -265,7 +267,14 @@ function AppContent() {
         isCompact={isCompact}
         onOpenAbout={() => openAbout()}
         onOpenHistory={() => setHistoryOpen(true)}
-        plannerSlot={<PlannerSheet busy={status === "loading"} onSearch={handleSearch} isCompact={isCompact} />}
+        plannerSlot={
+          <PlannerSheet
+            busy={status === "loading"}
+            onSearch={handleSearch}
+            onLocationError={handleLocationError}
+            isCompact={isCompact}
+          />
+        }
         resultsSlot={
           <div className="flex flex-col gap-3">
             <RefreshingIndicator visible={refreshing} />

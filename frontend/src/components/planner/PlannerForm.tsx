@@ -3,7 +3,7 @@ import { z } from "zod";
 import { resolvePlace } from "../../lib/places";
 import { presetDeparture } from "../../lib/time";
 import type { GeoPoint } from "../../lib/map";
-import type { ActivityType } from "../../types";
+import type { ActivityType, PlaceCandidate } from "../../types";
 import Button from "../ui/Button";
 import ActivityPicker, { ACTIVITY_OPTIONS } from "./ActivityPicker";
 import OriginDestinationFields, {
@@ -25,6 +25,7 @@ export interface PlannerSearch {
 
 export interface PlannerFormProps {
   onSearch: (search: PlannerSearch) => void;
+  onLocationError?: () => void;
   busy?: boolean;
 }
 
@@ -75,10 +76,12 @@ function collectValidationErrors(error: z.ZodError): ValidationErrors {
   return errors;
 }
 
-export default function PlannerForm({ onSearch, busy = false }: PlannerFormProps) {
+export default function PlannerForm({ onSearch, onLocationError, busy = false }: PlannerFormProps) {
   const fieldsRef = useRef<OriginDestinationFieldsHandle>(null);
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
+  const [originResolved, setOriginResolved] = useState<PlaceCandidate | null>(null);
+  const [destinationResolved, setDestinationResolved] = useState<PlaceCandidate | null>(null);
   const [activity, setActivity] = useState<ActivityType>("Cycling");
   const [departure, setDeparture] = useState(() => presetDeparture("now"));
   const [durationMax, setDurationMax] = useState<number | null>(null);
@@ -88,11 +91,13 @@ export default function PlannerForm({ onSearch, busy = false }: PlannerFormProps
   function handleOriginChange(value: string) {
     setOrigin(value);
     setErrors((prev) => ({ ...prev, origin: undefined }));
+    setOriginResolved((prev) => (prev && prev.label === value ? prev : null));
   }
 
   function handleDestinationChange(value: string) {
     setDestination(value);
     setErrors((prev) => ({ ...prev, destination: undefined }));
+    setDestinationResolved((prev) => (prev && prev.label === value ? prev : null));
   }
 
   function handleActivityChange(value: ActivityType) {
@@ -140,8 +145,12 @@ export default function PlannerForm({ onSearch, busy = false }: PlannerFormProps
     setPending(true);
     try {
       const [originResult, destinationResult] = await Promise.allSettled([
-        resolvePlace(origin),
-        resolvePlace(destination),
+        originResolved && originResolved.label === origin
+          ? Promise.resolve(originResolved)
+          : resolvePlace(origin),
+        destinationResolved && destinationResolved.label === destination
+          ? Promise.resolve(destinationResolved)
+          : resolvePlace(destination),
       ]);
       const resolvedOrigin = originResult.status === "fulfilled" ? originResult.value : null;
       const resolvedDestination =
@@ -177,6 +186,9 @@ export default function PlannerForm({ onSearch, busy = false }: PlannerFormProps
         destination={destination}
         onOriginChange={handleOriginChange}
         onDestinationChange={handleDestinationChange}
+        onOriginResolved={setOriginResolved}
+        onDestinationResolved={setDestinationResolved}
+        onLocationError={onLocationError}
       />
       {(errors.origin !== undefined || errors.destination !== undefined) && (
         <div className="flex flex-col gap-1">

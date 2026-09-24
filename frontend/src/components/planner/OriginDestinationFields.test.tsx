@@ -1,12 +1,14 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useRef, useState } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import * as api from "../../services/api";
+import type { PlaceCandidate } from "../../types";
 import OriginDestinationFields, {
   type OriginDestinationFieldsHandle,
 } from "./OriginDestinationFields";
 
-function Controlled() {
+function Controlled(props: { onOriginResolved?: (c: PlaceCandidate) => void; onLocationError?: () => void } = {}) {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   return (
@@ -15,6 +17,8 @@ function Controlled() {
       destination={destination}
       onOriginChange={setOrigin}
       onDestinationChange={setDestination}
+      onOriginResolved={props.onOriginResolved}
+      onLocationError={props.onLocationError}
     />
   );
 }
@@ -41,20 +45,36 @@ function RevalidateHarness() {
   );
 }
 
+function stubGeolocation(
+  impl: (
+    success: (position: GeolocationPosition) => void,
+    error: (error: GeolocationPositionError) => void,
+  ) => void,
+) {
+  Object.defineProperty(globalThis.navigator, "geolocation", {
+    configurable: true,
+    value: { getCurrentPosition: vi.fn(impl) },
+  });
+}
+
+function position(lat: number, lon: number): GeolocationPosition {
+  return { coords: { latitude: lat, longitude: lon } } as GeolocationPosition;
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  // @ts-expect-error test cleanup of a test-only stub
+  delete globalThis.navigator.geolocation;
+});
+
 describe("OriginDestinationFields", () => {
-  it("renders Desde/Hasta inputs and a disabled Usar mi ubicación button", () => {
+  it("renders Desde/Hasta autocomplete inputs and an enabled Usar mi ubicación button", () => {
     render(<Controlled />);
     expect(screen.getByLabelText(/Desde/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Hasta/)).toBeInTheDocument();
 
     const geolocate = screen.getByRole("button", { name: "Usar mi ubicación" });
-    expect(geolocate).toBeDisabled();
-  });
-
-  it("reserves the autocomplete arrow-down affordance on both fields", () => {
-    const { getByTestId } = render(<Controlled />);
-    expect(getByTestId("origin-autocomplete-hint")).toBeInTheDocument();
-    expect(getByTestId("destination-autocomplete-hint")).toBeInTheDocument();
+    expect(geolocate).toBeEnabled();
   });
 
   it("shows a Spanish inline error with aria wiring on blur", async () => {
@@ -99,5 +119,83 @@ describe("OriginDestinationFields", () => {
 
     expect(screen.getByLabelText("resultado")).toHaveTextContent("valid");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("selecting an autocomplete suggestion fills the field and resolves it", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "searchPlaces").mockResolvedValue([
+      { label: "Ciudad Real, España", lat: 38.9861, lon: -3.9292 },
+    ]);
+    const onOriginResolved = vi.fn();
+    render(<Controlled onOriginResolved={onOriginResolved} />);
+
+    await user.type(screen.getByLabelText(/Desde/), "Ciudad");
+    const option = await screen.findByRole("option", { name: "Ciudad Real, España" });
+    await user.click(option);
+
+    expect(onOriginResolved).toHaveBeenCalledWith({
+      label: "Ciudad Real, España",
+      lat: 38.9861,
+      lon: -3.9292,
+    });
+    expect(screen.getByLabelText(/Desde/)).toHaveValue("Ciudad Real, España");
+  });
+
+  it("fills the origin field from the browser's location on success", async () => {
+    const user = userEvent.setup();
+    stubGeolocation((success) => success(position(38.9861, -3.9292)));
+    vi.spyOn(api, "reverseGeocode").mockResolvedValue("Ciudad Real, España");
+    const onOriginResolved = vi.fn();
+    render(<Controlled onOriginResolved={onOriginResolved} />);
+
+    await user.click(screen.getByRole("button", { name: "Usar mi ubicación" }));
+
+    await waitFor(() => expect(screen.getByLabelText(/Desde/)).toHaveValue("Ciudad Real, España"));
+    expect(onOriginResolved).toHaveBeenCalledWith({
+      label: "Ciudad Real, España",
+      lat: 38.9861,
+      lon: -3.9292,
+    });
+  });
+
+  it("shows aria-busy on the location button while resolving", async () => {
+    const user = userEvent.setup();
+    let resolvePosition: (() => void) | undefined;
+    stubGeolocation((success) => {
+      resolvePosition = () => success(position(38.9861, -3.9292));
+    });
+    vi.spyOn(api, "reverseGeocode").mockResolvedValue("Ciudad Real, España");
+    render(<Controlled />);
+
+    const button = screen.getByRole("button", { name: "Usar mi ubicación" });
+    await user.click(button);
+
+    expect(button).toHaveAttribute("aria-busy", "true");
+    resolvePosition?.();
+    await waitFor(() => expect(button).not.toHaveAttribute("aria-busy"));
+  });
+
+  it("falls back to a generic label when reverse geocoding finds nothing", async () => {
+    const user = userEvent.setup();
+    stubGeolocation((success) => success(position(38.9861, -3.9292)));
+    vi.spyOn(api, "reverseGeocode").mockResolvedValue(null);
+    render(<Controlled />);
+
+    await user.click(screen.getByRole("button", { name: "Usar mi ubicación" }));
+
+    await waitFor(() => expect(screen.getByLabelText(/Desde/)).toHaveValue("Mi ubicación"));
+  });
+
+  it("calls onLocationError when geolocation permission is denied", async () => {
+    const user = userEvent.setup();
+    stubGeolocation((_success, error) =>
+      error({ code: 1, message: "denied" } as GeolocationPositionError),
+    );
+    const onLocationError = vi.fn();
+    render(<Controlled onLocationError={onLocationError} />);
+
+    await user.click(screen.getByRole("button", { name: "Usar mi ubicación" }));
+
+    await waitFor(() => expect(onLocationError).toHaveBeenCalledTimes(1));
   });
 });

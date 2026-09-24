@@ -5,12 +5,14 @@ import PlannerForm, { type PlannerSearch } from "./PlannerForm";
 export interface PlannerSheetProps {
   busy: boolean;
   onSearch: (search: PlannerSearch) => void;
+  onLocationError?: () => void;
   isCompact?: boolean;
 }
 
 export default function PlannerSheet({
   busy,
   onSearch,
+  onLocationError,
   isCompact = false,
 }: PlannerSheetProps) {
   const [open, setOpen] = useState(false);
@@ -31,7 +33,7 @@ export default function PlannerSheet({
           <h2 className="text-lg font-bold text-sand-900">Planificador</h2>
         </header>
         <div className="flex-1 overflow-y-auto p-5">
-          <PlannerForm onSearch={onSearch} busy={busy} />
+          <PlannerForm onSearch={onSearch} onLocationError={onLocationError} busy={busy} />
         </div>
       </section>
     );
@@ -45,7 +47,7 @@ export default function PlannerSheet({
         title="Planificador"
         onClose={() => setOpen(false)}
       >
-        <PlannerForm onSearch={handleSearch} busy={busy} />
+        <PlannerForm onSearch={handleSearch} onLocationError={onLocationError} busy={busy} />
       </Sheet>
     );
   }
