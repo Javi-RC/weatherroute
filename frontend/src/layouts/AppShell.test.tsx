@@ -4,6 +4,17 @@ import { describe, expect, it, vi } from "vitest";
 import AppShell from "./AppShell";
 
 describe("AppShell", () => {
+  it("renders a skip-link to #contenido as the first focusable element, visible only on focus", () => {
+    render(<AppShell />);
+
+    const links = screen.getAllByRole("link");
+    const skipLink = links[0];
+    expect(skipLink).toHaveTextContent("Saltar al contenido");
+    expect(skipLink).toHaveAttribute("href", "#contenido");
+    expect(skipLink).toHaveClass("sr-only");
+    expect(skipLink).toHaveClass("focus:not-sr-only");
+  });
+
   it("renders the header with the brand", () => {
     render(<AppShell />);
 

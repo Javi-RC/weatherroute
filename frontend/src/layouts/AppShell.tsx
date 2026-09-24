@@ -24,6 +24,12 @@ export default function AppShell({
 }: AppShellProps) {
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-sand-50">
+      <a
+        href="#contenido"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-ocean-700 focus:shadow-raise focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ocean-600 focus-visible:ring-offset-2"
+      >
+        Saltar al contenido
+      </a>
       <Header onOpenAbout={onOpenAbout} onOpenHistory={onOpenHistory} />
       <main id="contenido" className="absolute inset-0">
         <div data-testid="app-shell-map" className="absolute inset-0">
