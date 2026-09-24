@@ -57,3 +57,9 @@ export interface GeocodeResult {
   lat: number;
   lon: number;
 }
+
+export interface PlaceCandidate {
+  label: string;
+  lat: number;
+  lon: number;
+}

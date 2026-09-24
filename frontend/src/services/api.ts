@@ -1,4 +1,9 @@
-import type { AnalyzeRequest, GeocodeResult, RouteAnalysisResponse } from "../types";
+import type {
+  AnalyzeRequest,
+  GeocodeResult,
+  PlaceCandidate,
+  RouteAnalysisResponse,
+} from "../types";
 
 export class ApiError extends Error {
   readonly code: string;
@@ -51,6 +56,64 @@ export async function geocodePlace(q: string): Promise<GeocodeResult | null> {
     throw new ApiError("geocode_failed", "No encontramos ese lugar");
   }
   return { lat, lon };
+}
+
+const MIN_SEARCH_LENGTH = 2;
+
+export async function searchPlaces(query: string): Promise<PlaceCandidate[]> {
+  const trimmed = query.trim();
+  if (trimmed.length < MIN_SEARCH_LENGTH) return [];
+
+  let response: Response;
+  try {
+    response = await fetch(`/api/geocode/search?q=${encodeURIComponent(trimmed)}`);
+  } catch {
+    throw new ApiError("search_failed", "No pudimos buscar ese lugar");
+  }
+  if (!response.ok) {
+    throw new ApiError("search_failed", "No pudimos buscar ese lugar");
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new ApiError("search_failed", "No pudimos buscar ese lugar");
+  }
+
+  if (!isRecord(payload) || !Array.isArray(payload.candidates)) return [];
+
+  const candidates: PlaceCandidate[] = [];
+  for (const item of payload.candidates) {
+    if (!isRecord(item)) continue;
+    const { label, latitude, longitude } = item;
+    if (typeof label === "string" && isFiniteNumber(latitude) && isFiniteNumber(longitude)) {
+      candidates.push({ label, lat: latitude, lon: longitude });
+    }
+  }
+  return candidates;
+}
+
+export async function reverseGeocode(lat: number, lon: number): Promise<string | null> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/geocode/reverse?lat=${lat}&lon=${lon}`);
+  } catch {
+    throw new ApiError("reverse_geocode_failed", "No pudimos identificar ese lugar");
+  }
+  if (!response.ok) {
+    throw new ApiError("reverse_geocode_failed", "No pudimos identificar ese lugar");
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new ApiError("reverse_geocode_failed", "No pudimos identificar ese lugar");
+  }
+
+  if (!isRecord(payload) || typeof payload.label !== "string") return null;
+  return payload.label;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
