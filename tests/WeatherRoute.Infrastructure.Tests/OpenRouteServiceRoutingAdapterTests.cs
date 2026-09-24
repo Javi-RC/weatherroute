@@ -91,4 +91,82 @@ public class OpenRouteServiceRoutingAdapterTests
             ((IRouteProvider)adapter).CalculateRoutesAsync(
                 new Coordinates(0, 0), new Coordinates(1, 1), ActivityType.Driving, 0));
     }
+
+    [Fact]
+    public async Task SearchAsync_Parses_Candidates_In_Order()
+    {
+        var adapter = Build(req =>
+        {
+            Assert.StartsWith("/v2/geocode/search?text=", req.RequestUri!.PathAndQuery);
+            Assert.Equal("secret-key", req.Headers.GetValues("Authorization").Single());
+            return """
+            {"features":[
+              {"properties":{"label":"Ciudad Real, España"},"geometry":{"coordinates":[-3.929,38.986]},"bbox":[-4.0,38.9,-3.8,39.0]},
+              {"properties":{"label":"Ciudad Rodrigo, España"},"geometry":{"coordinates":[-6.53,40.6]}}
+            ]}
+            """;
+        });
+
+        var result = await ((IGeocodingDiscoveryProvider)adapter).SearchAsync("Ciudad");
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal("Ciudad Real, España", result[0].Label);
+        Assert.Equal(38.986, result[0].Latitude, 3);
+        Assert.Equal(-3.929, result[0].Longitude, 3);
+        Assert.Equal(new[] { -4.0, 38.9, -3.8, 39.0 }, result[0].BoundingBox);
+        Assert.Equal("Ciudad Rodrigo, España", result[1].Label);
+        Assert.Null(result[1].BoundingBox);
+    }
+
+    [Fact]
+    public async Task SearchAsync_Caps_At_Six_Candidates()
+    {
+        var adapter = Build(_ =>
+        {
+            var features = string.Join(",", Enumerable.Range(0, 10)
+                .Select(i => "{\"properties\":{\"label\":\"Place " + i + "\"},\"geometry\":{\"coordinates\":[0," + i + "]}}"));
+            return "{\"features\":[" + features + "]}";
+        });
+
+        var result = await ((IGeocodingDiscoveryProvider)adapter).SearchAsync("place");
+
+        Assert.Equal(6, result.Count);
+        Assert.Equal("Place 0", result[0].Label);
+    }
+
+    [Fact]
+    public async Task SearchAsync_Empty_Features_Returns_Empty_List()
+    {
+        var adapter = Build(_ => """{"features":[]}""");
+
+        var result = await ((IGeocodingDiscoveryProvider)adapter).SearchAsync("Nada por aqui");
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetPlaceNameAsync_Returns_Label_From_Reverse_Endpoint()
+    {
+        var adapter = Build(req =>
+        {
+            Assert.StartsWith("/v2/geocode/reverse?point.lon=", req.RequestUri!.PathAndQuery);
+            Assert.Contains("point.lat=", req.RequestUri!.PathAndQuery);
+            Assert.Contains("size=1", req.RequestUri!.PathAndQuery);
+            return """{"features":[{"properties":{"label":"Ciudad Real, España"}}]}""";
+        });
+
+        var label = await ((IGeocodingDiscoveryProvider)adapter).GetPlaceNameAsync(38.986, -3.929);
+
+        Assert.Equal("Ciudad Real, España", label);
+    }
+
+    [Fact]
+    public async Task GetPlaceNameAsync_No_Features_Returns_Null()
+    {
+        var adapter = Build(_ => """{"features":[]}""");
+
+        var label = await ((IGeocodingDiscoveryProvider)adapter).GetPlaceNameAsync(0, 0);
+
+        Assert.Null(label);
+    }
 }

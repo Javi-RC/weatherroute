@@ -7,8 +7,10 @@ using WeatherRoute.Domain.ValueObjects;
 
 namespace WeatherRoute.Infrastructure.Routing;
 
-public sealed class OpenRouteServiceRoutingAdapter : IGeocodingProvider, IRouteProvider
+public sealed class OpenRouteServiceRoutingAdapter : IGeocodingProvider, IRouteProvider, IGeocodingDiscoveryProvider
 {
+    private const int MaxSearchCandidates = 6;
+
     private readonly HttpClient _http;
     private readonly OpenRouteServiceOptions _options;
 
@@ -33,6 +35,46 @@ public sealed class OpenRouteServiceRoutingAdapter : IGeocodingProvider, IRouteP
             throw new GeocodingException($"No geocoding result for '{query}'.");
         var coords = features[0].GetProperty("geometry").GetProperty("coordinates");
         return new Coordinates(coords[1].GetDouble(), coords[0].GetDouble());
+    }
+
+    public async Task<IReadOnlyList<GeocodingCandidate>> SearchAsync(string query, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            return Array.Empty<GeocodingCandidate>();
+        var encoded = Uri.EscapeDataString(query.Trim());
+        using var req = new HttpRequestMessage(HttpMethod.Get, $"/v2/geocode/search?text={encoded}");
+        req.Headers.Add("Authorization", _options.ApiKey);
+        using var resp = await _http.SendAsync(req, ct);
+        resp.EnsureSuccessStatusCode();
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
+        var features = doc.RootElement.GetProperty("features");
+
+        var result = new List<GeocodingCandidate>();
+        foreach (var feature in features.EnumerateArray())
+        {
+            if (result.Count >= MaxSearchCandidates) break;
+            var label = feature.GetProperty("properties").GetProperty("label").GetString() ?? string.Empty;
+            var coords = feature.GetProperty("geometry").GetProperty("coordinates");
+            IReadOnlyList<double>? bbox = feature.TryGetProperty("bbox", out var bboxEl)
+                ? bboxEl.EnumerateArray().Select(e => e.GetDouble()).ToArray()
+                : null;
+            result.Add(new GeocodingCandidate(label, coords[1].GetDouble(), coords[0].GetDouble(), bbox));
+        }
+
+        return result;
+    }
+
+    public async Task<string?> GetPlaceNameAsync(double latitude, double longitude, CancellationToken ct = default)
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Get,
+            $"/v2/geocode/reverse?point.lon={longitude.ToString(System.Globalization.CultureInfo.InvariantCulture)}&point.lat={latitude.ToString(System.Globalization.CultureInfo.InvariantCulture)}&size=1");
+        req.Headers.Add("Authorization", _options.ApiKey);
+        using var resp = await _http.SendAsync(req, ct);
+        resp.EnsureSuccessStatusCode();
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
+        var features = doc.RootElement.GetProperty("features");
+        if (features.GetArrayLength() == 0) return null;
+        return features[0].GetProperty("properties").GetProperty("label").GetString();
     }
 
     public async Task<IReadOnlyList<ExternalRoute>> CalculateRoutesAsync(
