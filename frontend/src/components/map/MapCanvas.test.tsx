@@ -26,6 +26,7 @@ function route(overrides: Partial<MapRouteInput> = {}): MapRouteInput {
     originLabel: "Andorra la Vella",
     destinationLabel: "Encamp",
     geometry: { type: "LineString", coordinates: [[1.5, 42.5], [1.7, 42.6]] },
+    selected: false,
     ...overrides,
   };
 }
@@ -120,7 +121,7 @@ describe("MapCanvas", () => {
     expect(options?.maxZoom).toBe(14);
     expect(bounds.getWest()).not.toBeCloseTo(0);
     expect(options?.padding).toEqual(
-      expect.objectContaining({ top: 64, right: 64, bottom: 64, left: 64 }),
+      expect.objectContaining({ top: 32, right: 32, bottom: 32, left: 412 }),
     );
   });
 
@@ -243,7 +244,7 @@ describe("MapCanvas", () => {
     emitLoad(map);
     expect(StubMap.instances).toHaveLength(1);
     expect(map.fitBoundsCalls[0].options?.padding).toEqual(
-      expect.objectContaining({ top: 64, bottom: 64 }),
+      expect.objectContaining({ top: 32, bottom: 32 }),
     );
 
     rerender(

@@ -35,6 +35,7 @@ function toMapRouteInput(
   route: RouteCandidate,
   originLabel: string,
   destinationLabel: string,
+  selected: boolean,
 ): MapRouteInput {
   return {
     riskLevel: route.riskLevel,
@@ -49,6 +50,7 @@ function toMapRouteInput(
         (point): LngLat => [point.longitude, point.latitude],
       ),
     },
+    selected,
   };
 }
 
@@ -140,8 +142,10 @@ function AppContent() {
 
   const mapRoutes = useMemo<MapRouteInput[]>(() => {
     if (!result) return [];
-    return result.routes.map((route) => toMapRouteInput(route, originLabel, destinationLabel));
-  }, [result, originLabel, destinationLabel]);
+    return result.routes.map((route, index) =>
+      toMapRouteInput(route, originLabel, destinationLabel, index === selectedRouteId),
+    );
+  }, [result, originLabel, destinationLabel, selectedRouteId]);
 
   function handleSearch(search: PlannerSearch) {
     const request: AnalyzeRequest = {

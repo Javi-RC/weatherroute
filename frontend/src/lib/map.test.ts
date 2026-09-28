@@ -5,6 +5,7 @@ import {
   buildRouteFeatures,
   computeBounds,
   fitBoundsOptions,
+  SIDEBAR_PADDING,
   type LineStringGeometry,
   type MapRouteInput,
 } from "./map";
@@ -24,6 +25,7 @@ function route(overrides: Partial<MapRouteInput> = {}): MapRouteInput {
     originLabel: "Andorra la Vella",
     destinationLabel: "Encamp",
     geometry: lineString([1.5, 42.5], [1.6, 42.5]),
+    selected: false,
     ...overrides,
   };
 }
@@ -52,11 +54,22 @@ describe("buildRouteFeatures", () => {
         score: 62,
         originLabel: "Andorra la Vella",
         destinationLabel: "Encamp",
+        selected: false,
       },
       geometry: lineString([1.5, 42.5], [1.6, 42.5]),
     });
     expect(features[1].id).toBe(1);
     expect(features[1].properties.routeIndex).toBe(1);
+  });
+
+  it("marks the selected route in the feature properties", () => {
+    const features = buildRouteFeatures([
+      route({ riskLevel: "Low" }),
+      route({ riskLevel: "High", selected: true }),
+    ]).features;
+
+    expect(features[0].properties.selected).toBe(false);
+    expect(features[1].properties.selected).toBe(true);
   });
 
   it("carries the color from RISK_COLORS for every risk level", () => {
@@ -99,20 +112,19 @@ describe("computeBounds", () => {
 });
 
 describe("fitBoundsOptions", () => {
-  it("uses symmetric padding on desktop", () => {
+  it("frames desktop routes clear of the sidebar", () => {
     const options = fitBoundsOptions({ isCompact: false });
-    expect(options.padding.top).toBe(options.padding.right);
-    expect(options.padding.right).toBe(options.padding.bottom);
-    expect(options.padding.bottom).toBe(options.padding.left);
-    expect(options.padding.top).toBe(64);
+    expect(options.padding.left).toBe(SIDEBAR_PADDING);
+    expect(options.padding.left).toBeGreaterThan(options.padding.right);
+    expect(options.padding.right).toBe(32);
   });
 
-  it("adds extra bottom padding on compact layouts to clear sheets", () => {
+  it("keeps the mobile padding for the bottom sheet", () => {
     const compact = fitBoundsOptions({ isCompact: true });
     expect(compact.padding.bottom).toBeGreaterThan(compact.padding.top);
     expect(compact.padding.bottom).toBe(320);
     expect(compact.padding.top).toBe(64);
-    expect(compact.padding.bottom).toBeGreaterThan(compact.padding.left);
+    expect(compact.padding.left).toBe(24);
   });
 
   it("caps the fit zoom on both layouts", () => {

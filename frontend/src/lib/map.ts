@@ -16,6 +16,7 @@ export interface MapRouteInput {
   originLabel: string;
   destinationLabel: string;
   geometry: LineStringGeometry;
+  selected: boolean;
 }
 
 export interface RouteFeatureProperties {
@@ -27,6 +28,7 @@ export interface RouteFeatureProperties {
   score: number;
   originLabel: string;
   destinationLabel: string;
+  selected: boolean;
 }
 
 export interface RouteFeature {
@@ -56,6 +58,7 @@ export function buildRouteFeatures(routes: readonly MapRouteInput[]): RouteFeatu
         score: route.score,
         originLabel: route.originLabel,
         destinationLabel: route.destinationLabel,
+        selected: route.selected,
       },
       geometry: route.geometry,
     })),
@@ -101,7 +104,9 @@ export interface FitBoundsOptions {
   maxZoom?: number;
 }
 
-const DESKTOP_PADDING = 64;
+export const SIDEBAR_PADDING = 412;
+const DESKTOP_EDGE_PADDING = 32;
+const DESKTOP_TOP_PADDING = 32;
 const MOBILE_EDGE_PADDING = 24;
 const MOBILE_TOP_PADDING = 64;
 const MOBILE_BOTTOM_PADDING = 320;
@@ -122,10 +127,10 @@ export function fitBoundsOptions(view: MapView): FitBoundsOptions {
 
   return {
     padding: {
-      top: DESKTOP_PADDING,
-      right: DESKTOP_PADDING,
-      bottom: DESKTOP_PADDING,
-      left: DESKTOP_PADDING,
+      top: DESKTOP_TOP_PADDING,
+      right: DESKTOP_EDGE_PADDING,
+      bottom: DESKTOP_EDGE_PADDING,
+      left: SIDEBAR_PADDING,
     },
     maxZoom: FIT_MAX_ZOOM,
   };
