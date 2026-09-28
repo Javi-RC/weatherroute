@@ -225,7 +225,7 @@ public class RouteAnalyzeTests : IClassFixture<WebApplicationFactory<Program>>
 
         public StubWeather(bool fail) => _fail = fail;
 
-        public async Task<ExternalWeather> GetForecastAsync(
+        public async Task<ExternalWeather?> GetForecastAsync(
             Coordinates coordinates, DateTime timestampUtc, CancellationToken ct = default)
         {
             if (_fail) throw new HttpRequestException("upstream down");

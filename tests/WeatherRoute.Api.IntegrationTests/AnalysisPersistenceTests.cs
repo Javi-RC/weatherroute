@@ -53,7 +53,7 @@ public sealed class AnalysisPersistenceTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElementWrapper>();
-        Assert.NotEqual(Guid.Empty, body.Id);
+        Assert.NotEqual(Guid.Empty, body!.Id);
     }
 
     public Task InitializeAsync() => _postgres.StartAsync();
