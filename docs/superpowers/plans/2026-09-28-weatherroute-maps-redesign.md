@@ -210,6 +210,37 @@ underspecified in these places — the code is right, the plan was not:
   chart is measurable) and the missing-weather case. The plan's
   "renders nothing when no route is selected" case is kept verbatim.
 
+### Deviations found while executing Task 19 (2026-09-28)
+
+- **`AppShell` had to change API in this task, not in Task 20.** The plan's new
+  props (`headerSlot` / `sidebarSlot`) do not exist on today's shell, which
+  renders `<Header>` itself and takes `plannerSlot` / `resultsSlot` /
+  `welcomeSlot` / `legendSlot` / `onOpenAbout` / `onOpenHistory`. Leaving
+  `App.tsx` untouched would not have kept the build green, so the header
+  callbacks moved to `App`, which now passes `headerSlot={<Header … />}`, and
+  the planner + results were merged into one `sidebarSlot` — the composition
+  Task 20 owns. Task 20 keeps composing, it no longer introduces the layout.
+- **`welcomeSlot` and `legendSlot` survive on `AppShell`, still as map
+  overlays.** The new API has nowhere else to put them, and dropping them would
+  delete the `EmptyState` and the legend mid-redesign. `MapControlBar` replaces
+  `legendSlot` in Task 20.
+- **The `Sidebar` owns the mobile collapse and `App` stopped passing
+  `isCompact` to `PlannerSheet`.** `PlannerSheet` already renders its own FAB +
+  `Sheet` on mobile, so the plan's "a `Sheet` with a fixed FAB trigger on
+  mobile" would have produced two planner triggers (making the plan's own
+  `/planificador/i` query ambiguous) and a `Sheet` nested inside a `Sheet` —
+  and `Sheet` traps focus, so the inner one would be unreachable. One owner, one
+  sheet. `PlannerSheet` keeps its `isCompact` prop for its own callers.
+- **The skip link now reads "Saltar al mapa"** instead of "Saltar al
+  contenido", because `#contenido` is the map region in the new layout; the
+  `sr-only` / `focus:not-sr-only` contract and the `href` are unchanged.
+- **15 cases in the rewritten `AppShell.test.tsx`** — the old file asserted the
+  absolutely-positioned shell this task deletes, so it was rewritten rather than
+  patched. Beyond the plan's four: `main#contenido`, the header slot, the
+  sidebar width classes, the compact sheet actually opening with its content,
+  the map surviving on mobile, both overlays present/absent, the compact legend
+  position, and a single planner trigger.
+
 ---
 
 ## File Structure
@@ -2757,7 +2788,7 @@ git commit -m "feat: add the floating route detail card and the map control bar"
 - Consumes: `headerSlot`, `sidebarSlot`, `children` (the map).
 - Produces: a `flex` row. Sidebar `w-[380px] xl:w-[400px]`, map `flex-1 min-w-0 relative`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 it("lays out the sidebar beside the map rather than over it", () => {
@@ -2787,7 +2818,7 @@ it("still offers a skip link to the map region", () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 npm test -- src/layouts/AppShell.test.tsx
@@ -2795,7 +2826,7 @@ npm test -- src/layouts/AppShell.test.tsx
 
 Expected: FAIL — the current shell is `relative` with absolutely-positioned slots.
 
-- [ ] **Step 3: Rewrite `AppShell`**
+- [x] **Step 3: Rewrite `AppShell`**
 
 ```tsx
 export interface AppShellProps {
@@ -2825,7 +2856,7 @@ export default function AppShell({ headerSlot, sidebarSlot, children }: AppShell
 }
 ```
 
-- [ ] **Step 4: Write `Sidebar`**
+- [x] **Step 4: Write `Sidebar`**
 
 ```tsx
 import type { ReactNode } from "react";
@@ -2846,7 +2877,7 @@ export default function Sidebar({ children }: SidebarProps) {
 }
 ```
 
-- [ ] **Step 5: Collapse the sidebar into a bottom sheet below 1024px**
+- [x] **Step 5: Collapse the sidebar into a bottom sheet below 1024px**
 
 A fixed 380px column is unusable on a phone, so `Sidebar` becomes dual-mode, mirroring the pattern `PlannerSheet` already uses. Give `AppShell` an `isCompact` prop:
 
@@ -2873,7 +2904,7 @@ it("replaces the sidebar column with a sheet trigger on mobile", () => {
 });
 ```
 
-- [ ] **Step 6: Run it**
+- [x] **Step 6: Run it**
 
 ```bash
 npm test -- src/layouts/AppShell.test.tsx && npm run typecheck
@@ -2881,7 +2912,7 @@ npm test -- src/layouts/AppShell.test.tsx && npm run typecheck
 
 Expected: PASS. `App.tsx` must pass `isCompact` and move `plannerSlot`/`resultsSlot` into a single `sidebarSlot` — Task 20 does that; until then pass `isCompact` and the current slots so the build stays green.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/src/layouts/AppShell.tsx frontend/src/components/layout/Sidebar.tsx frontend/src/layouts/AppShell.test.tsx

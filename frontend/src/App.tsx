@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import AboutModal, { type AboutSection } from "./components/about/AboutModal";
+import Header from "./components/Header";
 import HistorySheet from "./components/history/HistorySheet";
 import MapCanvas from "./components/map/MapCanvas";
 import MapLegend from "./components/map/MapLegend";
@@ -256,18 +257,16 @@ function AppContent() {
     <>
       <AppShell
         isCompact={isCompact}
-        onOpenAbout={() => openAbout()}
-        onOpenHistory={() => setHistoryOpen(true)}
-        plannerSlot={
-          <PlannerSheet
-            busy={status === "loading"}
-            onSearch={handleSearch}
-            onLocationError={handleLocationError}
-            isCompact={isCompact}
-          />
+        headerSlot={
+          <Header onOpenAbout={() => openAbout()} onOpenHistory={() => setHistoryOpen(true)} />
         }
-        resultsSlot={
-          <div className="flex flex-col gap-3">
+        sidebarSlot={
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+            <PlannerSheet
+              busy={status === "loading"}
+              onSearch={handleSearch}
+              onLocationError={handleLocationError}
+            />
             <RefreshingIndicator visible={refreshing} />
             <ResultsLayer
               viewState={status}
