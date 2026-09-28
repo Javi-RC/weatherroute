@@ -26,7 +26,7 @@ public class RouteAnalyzeTests : IClassFixture<WebApplicationFactory<Program>>
 
     public RouteAnalyzeTests(WebApplicationFactory<Program> factory) => _factory = factory;
 
-    private WebApplicationFactory<Program> Build(IReadOnlyList<ExternalRoute> routes, bool weatherFails = false) =>
+    private WebApplicationFactory<Program> Build(IReadOnlyList<ExternalRoute> routes, bool weatherFails = false, IGeocodingProvider? geocoder = null) =>
         _factory.WithWebHostBuilder(b =>
         {
             b.UseSetting("Persistence:AutoMigrate", "false");
@@ -36,7 +36,7 @@ public class RouteAnalyzeTests : IClassFixture<WebApplicationFactory<Program>>
                 services.RemoveAll<IGeocodingProvider>();
                 services.RemoveAll<IRouteProvider>();
                 services.RemoveAll<IWeatherProvider>();
-                services.AddSingleton<IGeocodingProvider>(new StubGeocoder());
+                services.AddSingleton<IGeocodingProvider>(geocoder ?? new StubGeocoder());
                 services.AddSingleton<IRouteProvider>(new StubRouteProvider(routes.ToArray()));
                 services.AddSingleton<IWeatherProvider>(new StubWeather(weatherFails));
             });
@@ -109,6 +109,76 @@ public class RouteAnalyzeTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.InRange(routes[0].GetProperty("durationMinutes").GetInt32(), 59, 62);
     }
 
+    [Fact]
+    public async Task Analyze_Accepts_Coordinates_Without_Text()
+    {
+        using var factory = Build(new[] { Route("a", 20) }, geocoder: new ThrowingGeocoder());
+        var client = factory.CreateClient();
+
+        var resp = await client.PostAsJsonAsync("/api/routes/analyze", new
+        {
+            activity = "Cycling",
+            departureTime = "2026-09-28T08:00:00Z",
+            originCoordinates = new { latitude = 40.4168, longitude = -3.7038 },
+            destinationCoordinates = new { latitude = 39.8628, longitude = -4.0273 }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        Assert.True(doc.RootElement.GetProperty("routeAvailable").GetBoolean());
+        Assert.Equal(1, doc.RootElement.GetProperty("routes").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task Analyze_Accepts_A_Mix_Of_Text_And_Coordinates()
+    {
+        using var factory = Build(new[] { Route("a", 20) });
+        var client = factory.CreateClient();
+
+        var resp = await client.PostAsJsonAsync("/api/routes/analyze", new
+        {
+            origin = "Ciudad Real",
+            activity = "Cycling",
+            departureTime = "2026-09-28T08:00:00Z",
+            destinationCoordinates = new { latitude = 39.8628, longitude = -4.0273 }
+        });
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Missing_Origin_Text_And_Coordinates_Returns_ValidationProblem()
+    {
+        using var factory = Build(new[] { Route("a", 20) });
+        var client = factory.CreateClient();
+
+        var resp = await client.PostAsJsonAsync("/api/routes/analyze",
+            new { destination = "Almagro", activity = "Cycling", departureTime = "2026-09-28T08:00:00Z" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        Assert.True(doc.RootElement.GetProperty("errors").TryGetProperty("Origin", out _));
+    }
+
+    [Fact]
+    public async Task Out_Of_Range_Coordinates_Return_ValidationProblem()
+    {
+        using var factory = Build(new[] { Route("a", 20) });
+        var client = factory.CreateClient();
+
+        var resp = await client.PostAsJsonAsync("/api/routes/analyze", new
+        {
+            origin = "Ciudad Real",
+            activity = "Cycling",
+            departureTime = "2026-09-28T08:00:00Z",
+            destinationCoordinates = new { latitude = 91.0, longitude = 0.0 }
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        Assert.True(doc.RootElement.GetProperty("errors").TryGetProperty("DestinationCoordinates", out _));
+    }
+
     private static object ValidBody() => new
     {
         origin = "Ciudad Real",
@@ -130,6 +200,12 @@ public class RouteAnalyzeTests : IClassFixture<WebApplicationFactory<Program>>
     {
         public Task<Coordinates> GeocodeAsync(string query, CancellationToken ct = default) =>
             Task.FromResult(new Coordinates(38.0, -4.0));
+    }
+
+    private sealed class ThrowingGeocoder : IGeocodingProvider
+    {
+        public Task<Coordinates> GeocodeAsync(string query, CancellationToken ct = default) =>
+            throw new InvalidOperationException($"Geocoding must not be called, but was called with '{query}'.");
     }
 
     private sealed class StubRouteProvider : IRouteProvider
