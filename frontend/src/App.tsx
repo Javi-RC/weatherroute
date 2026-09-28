@@ -10,7 +10,7 @@ import RefreshingIndicator from "./components/results/RefreshingIndicator";
 import ResultsLayer from "./components/results/ResultsLayer";
 import EmptyState from "./components/ui/EmptyState";
 import { findBestRouteIndex } from "./i18n/recommendation";
-import { useMediaQuery } from "./lib/useMediaQuery";
+import { useIsDesktop } from "./lib/breakpoints";
 import { resolvePlace } from "./lib/places";
 import type { GeoPoint, LngLat, MapRouteInput } from "./lib/map";
 import { useRecentSearches } from "./hooks/useRecentSearches";
@@ -28,8 +28,6 @@ const REFRESH_ERROR_MESSAGE = "No se pudo actualizar la ruta. Se conservan los r
 const WEATHER_UNAVAILABLE_TOAST = "No hay previsión meteorológica para esa fecha. Mostramos distancia y duración.";
 const ROUTE_UNAVAILABLE_TOAST = "El servicio de rutas está temporalmente no disponible.";
 const LOCATION_ERROR_MESSAGE = "No pudimos obtener tu ubicación. Revisa los permisos del navegador.";
-
-const DESKTOP_QUERY = "(min-width: 1024px)";
 
 function toMapRouteInput(
   route: RouteCandidate,
@@ -81,7 +79,7 @@ function AppContent() {
   const refreshRequestRef = useRef<AnalyzeRequest | null>(null);
   const intentRef = useRef<{ request: AnalyzeRequest; isRefresh: boolean } | null>(null);
 
-  const isCompact = !useMediaQuery(DESKTOP_QUERY);
+  const isCompact = !useIsDesktop();
 
   const mutation = useMutation({
     mutationFn: analyzeRoute,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useIsDesktop } from "../../lib/breakpoints";
 import type { RouteCandidate } from "../../types";
 import Sheet from "../ui/Sheet";
 import FactorList from "./FactorList";
@@ -14,25 +14,7 @@ export interface RouteDetailProps {
   onHowCalculated?: () => void;
 }
 
-const MOBILE_BREAKPOINT = "(min-width: 768px)";
 const WEATHER_WARNING = "Detalles meteorológicos no disponibles — máximo 7 días de previsión.";
-
-function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState<boolean>(() =>
-    typeof window.matchMedia === "function" ? window.matchMedia(query).matches : false,
-  );
-
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") return;
-    const media = window.matchMedia(query);
-    const onChange = () => setMatches(media.matches);
-    onChange();
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
-  }, [query]);
-
-  return matches;
-}
 
 export default function RouteDetail({
   route,
@@ -42,7 +24,8 @@ export default function RouteDetail({
   onClose,
   onHowCalculated,
 }: RouteDetailProps) {
-  const compact = isCompact ?? !useMediaQuery(MOBILE_BREAKPOINT);
+  const desktop = useIsDesktop();
+  const compact = isCompact ?? !desktop;
 
   const content = (
     <div className="space-y-5">
