@@ -57,6 +57,7 @@ export default function MapCanvas({
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const onSelectRouteRef = useRef(onSelectRoute);
   const onPickPointRef = useRef(onPickPoint);
+  const pickModeRef = useRef(pickMode);
   const paintStateRef = useRef<PaintState>({
     routes,
     selectedRouteId,
@@ -75,6 +76,10 @@ export default function MapCanvas({
   useEffect(() => {
     onPickPointRef.current = onPickPoint;
   }, [onPickPoint]);
+
+  useEffect(() => {
+    pickModeRef.current = pickMode;
+  }, [pickMode]);
 
   useEffect(() => {
     isCompactRef.current = isCompact;
@@ -183,6 +188,25 @@ export default function MapCanvas({
       paint(map);
     });
 
+    const handleMapClick = (event: maplibregl.MapMouseEvent) => {
+      const hits = map.queryRenderedFeatures(event.point, { layers: ["route-lines"] });
+      if (hits.length > 0) return;
+
+      if (pickModeRef.current === "none") return;
+      const pick = onPickPointRef.current;
+      if (!pick) return;
+      pick({ latitude: event.lngLat.lat, longitude: event.lngLat.lng });
+    };
+
+    map.on("click", handleMapClick);
+
+    map.on("mousemove", "route-lines", () => {
+      map.getCanvas().style.cursor = "pointer";
+    });
+    map.on("mouseleave", "route-lines", () => {
+      map.getCanvas().style.cursor = pickModeRef.current === "none" ? "" : "crosshair";
+    });
+
     map.on("click", "route-lines", (event: MapLayerMouseEvent) => {
       const routeIndex = event.features?.[0]?.properties?.routeIndex as number | undefined;
       if (typeof routeIndex !== "number") return;
@@ -195,11 +219,18 @@ export default function MapCanvas({
       popupRef.current = null;
       for (const marker of markersRef.current) marker.remove();
       markersRef.current = [];
+      map.off("click", handleMapClick);
       map.remove();
       mapRef.current = null;
       paintedRef.current = false;
     };
   }, [paint, showRoutePopup]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.getCanvas().style.cursor = pickMode === "none" ? "" : "crosshair";
+  }, [pickMode]);
 
   useEffect(() => {
     const map = mapRef.current;

@@ -300,6 +300,77 @@ describe("MapCanvas", () => {
     expect(popup.html).not.toContain("→");
   });
 
+  it("picks a point when the map is clicked while picking", () => {
+    const onPickPoint = vi.fn();
+    render(<MapCanvas routes={[]} selectedRouteId={null} onSelectRoute={vi.fn()} pickMode="origin" onPickPoint={onPickPoint} />);
+    const map = StubMap.instances.at(-1)!;
+    emitLoad(map);
+    map.renderedFeatures = [];
+
+    act(() => map._emit("click", { lngLat: { lng: -3.7038, lat: 40.4168 }, point: { x: 0, y: 0 } }));
+
+    expect(onPickPoint).toHaveBeenCalledWith({ latitude: 40.4168, longitude: -3.7038 });
+  });
+
+  it("selects the route instead of picking when the click lands on one", () => {
+    const onPickPoint = vi.fn();
+    const onSelectRoute = vi.fn();
+    render(
+      <MapCanvas
+        routes={makeRoutes(1)}
+        selectedRouteId={null}
+        onSelectRoute={onSelectRoute}
+        pickMode="origin"
+        onPickPoint={onPickPoint}
+      />,
+    );
+    const map = StubMap.instances.at(-1)!;
+    emitLoad(map);
+    map.renderedFeatures = [{ properties: { routeIndex: 0 } }];
+
+    act(() => map._emit("click", "route-lines", { lngLat: [0, 0], point: { x: 0, y: 0 }, features: [{ properties: { routeIndex: 0 } }] }));
+
+    expect(onSelectRoute).toHaveBeenCalledWith(0);
+    expect(onPickPoint).not.toHaveBeenCalled();
+  });
+
+  it("ignores clicks on the map when no mode is active", () => {
+    const onPickPoint = vi.fn();
+    render(<MapCanvas routes={[]} selectedRouteId={null} onSelectRoute={vi.fn()} pickMode="none" onPickPoint={onPickPoint} />);
+    const map = StubMap.instances.at(-1)!;
+    emitLoad(map);
+    map.renderedFeatures = [];
+
+    act(() => map._emit("click", { lngLat: { lng: 0, lat: 0 }, point: { x: 0, y: 0 } }));
+
+    expect(onPickPoint).not.toHaveBeenCalled();
+  });
+
+  it("shows a crosshair cursor while picking and clears it afterwards", () => {
+    const { rerender } = render(
+      <MapCanvas routes={[]} selectedRouteId={null} onSelectRoute={vi.fn()} pickMode="destination" />,
+    );
+    const map = StubMap.instances.at(-1)!;
+    emitLoad(map);
+    expect(map.getCanvas().style.cursor).toBe("crosshair");
+
+    rerender(<MapCanvas routes={[]} selectedRouteId={null} onSelectRoute={vi.fn()} pickMode="none" />);
+
+    expect(map.getCanvas().style.cursor).toBe("");
+  });
+
+  it("shows a pointer cursor over a route", () => {
+    render(<MapCanvas routes={makeRoutes(1)} selectedRouteId={null} onSelectRoute={vi.fn()} />);
+    const map = StubMap.instances.at(-1)!;
+    emitLoad(map);
+
+    act(() => map._emit("mousemove", "route-lines", { point: { x: 0, y: 0 } }));
+    expect(map.getCanvas().style.cursor).toBe("pointer");
+
+    act(() => map._emit("mouseleave", "route-lines", { point: { x: 0, y: 0 } }));
+    expect(map.getCanvas().style.cursor).toBe("");
+  });
+
   it("cleans up the map on unmount", () => {
     const { unmount } = render(<MapCanvas routes={makeRoutes(1)} selectedRouteId={null} onSelectRoute={vi.fn()} />);
     const map = StubMap.instances.at(-1)!;

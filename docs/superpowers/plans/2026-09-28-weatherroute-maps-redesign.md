@@ -83,6 +83,17 @@ underspecified in these places — the code is right, the plan was not:
   their repaint effect and the `route-hover` filter are already correct before
   Task 14 provides a producer for them.
 
+### Deviations found while executing Task 12 (2026-09-28)
+
+- **`pickMode` / `onPickPoint` stay optional, so `App.tsx` is untouched.** The
+  plan wanted them required plus `pickMode="none"` / `onPickPoint={() => {}}`
+  placeholders at the call site. Optional props with those same defaults (from
+  Task 11) are the same contract without the dead placeholder, and Task 20
+  makes `App` the real producer.
+- **The cursor tests also assert the reset.** `mouseleave` and the `pickMode`
+  effect clear the cursor to `""`; without that assertion the crosshair would
+  survive a mode switch.
+
 ---
 
 ## File Structure
@@ -1568,7 +1579,7 @@ git commit -m "feat: draw routes with a casing layer and dim the unselected ones
 - Produces: `export type PickMode = "none" | "origin" | "destination";`
 - Consumes: `onPickPoint(point: GeoPoint)`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it("picks a point when the map is clicked while picking", async () => {
@@ -1613,7 +1624,7 @@ it("shows a pointer cursor over a route", async () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 npm test -- src/components/map/MapCanvas.test.tsx
@@ -1621,7 +1632,7 @@ npm test -- src/components/map/MapCanvas.test.tsx
 
 Expected: FAIL — no `pickMode` prop, and the map-level click handler does not exist.
 
-- [ ] **Step 3: Add the props and the handler**
+- [x] **Step 3: Add the props and the handler**
 
 Add to `MapCanvas.tsx`:
 ```ts
@@ -1678,7 +1689,7 @@ And keep the cursor correct when the mode changes — add an effect:
   }, [pickMode]);
 ```
 
-- [ ] **Step 4: Run it**
+- [x] **Step 4: Run it**
 
 ```bash
 npm test -- src/components/map/MapCanvas.test.tsx && npm run typecheck
@@ -1686,7 +1697,7 @@ npm test -- src/components/map/MapCanvas.test.tsx && npm run typecheck
 
 Expected: PASS. `App.tsx` will now fail to typecheck until it passes `pickMode`/`onPickPoint`; that is Task 20 — until then, add placeholder props at the call site (`pickMode="none"`, `onPickPoint={() => {}}`) so the suite stays green, and replace them in Task 20.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/map/MapCanvas.tsx frontend/src/components/map/MapCanvas.test.tsx frontend/src/App.tsx
