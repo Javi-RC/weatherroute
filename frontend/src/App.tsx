@@ -12,6 +12,7 @@ import type { PlannerSearch } from "./components/planner/PlannerForm";
 import RefreshingIndicator from "./components/results/RefreshingIndicator";
 import ResultsLayer from "./components/results/ResultsLayer";
 import EmptyState from "./components/ui/EmptyState";
+import LiveRegion from "./components/ui/LiveRegion";
 import { findBestRouteIndex } from "./i18n/recommendation";
 import { useIsDesktop } from "./lib/breakpoints";
 import { resolvePlace } from "./lib/places";
@@ -84,6 +85,7 @@ function AppContent() {
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
   const [runId, setRunId] = useState(0);
   const restoredRef = useRef(false);
+  const [announcement, setAnnouncement] = useState<string | null>(null);
 
   const analysis = useRouteAnalysis({
     saveToHistory: history.save,
@@ -129,6 +131,7 @@ function AppContent() {
 
   function handleSelectRoute(index: number) {
     setSelectedRouteId(index);
+    setAnnouncement(`Ruta ${index + 1} seleccionada`);
     updateUrl({ selectedRouteIndex: index });
   }
 
@@ -164,11 +167,13 @@ function AppContent() {
     if (pickMode === "origin") {
       setOriginPoint(point);
       setOriginLabel(label);
+      setAnnouncement(`Origen fijado en ${label}`);
       updateUrl({ origin: point, originLabel: label });
       setPickMode("destination");
     } else if (pickMode === "destination") {
       setDestinationPoint(point);
       setDestinationLabel(label);
+      setAnnouncement(`Destino fijado en ${label}`);
       updateUrl({ destination: point, destinationLabel: label });
       setPickMode("none");
     }
@@ -348,6 +353,7 @@ function AppContent() {
           />
         </div>
         <MapControlBar compact={isCompact} />
+        <LiveRegion message={announcement} />
       </AppShell>
       <HistorySheet
         open={historyOpen}

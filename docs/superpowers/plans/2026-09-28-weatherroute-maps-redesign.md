@@ -3411,7 +3411,7 @@ Adaptations: the old `ROUTE_UNAVAILABLE_MESSAGE` partial banner is dropped (the 
 **Interfaces:**
 - Produces: `LiveRegion({ message: string | null })` rendering a visually hidden `aria-live="polite"` region. The visual companion already does this for toasts (`hooks/useToasts.tsx`); this one is for map-driven state.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```tsx
 it("announces a message politely", () => {
@@ -3427,7 +3427,7 @@ it("renders nothing visible when there is no message", () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 npm test -- src/components/ui/LiveRegion.test.tsx
@@ -3435,7 +3435,7 @@ npm test -- src/components/ui/LiveRegion.test.tsx
 
 Expected: FAIL — module does not exist.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```tsx
 export interface LiveRegionProps {
@@ -3452,7 +3452,7 @@ export default function LiveRegion({ message }: LiveRegionProps) {
 }
 ```
 
-- [ ] **Step 4: Wire the announcements in `App`**
+- [x] **Step 4: Wire the announcements in `App`**
 
 ```tsx
   const [announcement, setAnnouncement] = useState<string | null>(null);
@@ -3466,7 +3466,7 @@ and in `handleSelectRoute`:
     setAnnouncement(`Ruta ${index + 1} seleccionada`);
 ```
 
-- [ ] **Step 5: Run it**
+- [x] **Step 5: Run it**
 
 ```bash
 npm test && npm run typecheck && npm run build
@@ -3474,7 +3474,9 @@ npm test && npm run typecheck && npm run build
 
 Expected: PASS, and `vite build` succeeds.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
+
+`LiveRegion` renders inside `AppShell` children (next to `MapControlBar`) via `<LiveRegion message={announcement} />`. Announcements also cover the destination pick ("Destino fijado en …").
 
 ```bash
 git add frontend/src/components/ui/LiveRegion.tsx frontend/src/components/ui/LiveRegion.test.tsx frontend/src/App.tsx
