@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { RouteCandidate, RouteSegment } from "../../types";
@@ -43,10 +43,7 @@ function props(overrides: Partial<ResultsLayerProps> = {}): ResultsLayerProps {
     weatherAvailable: true,
     routeAvailable: true,
     selectedRouteId: null,
-    expandedRouteId: null,
     onSelectRoute: vi.fn(),
-    onToggleExpand: vi.fn(),
-    onCloseDetail: vi.fn(),
     onRetry: vi.fn(),
     onNewSearch: vi.fn(),
     error: null,
@@ -122,30 +119,11 @@ describe("ResultsLayer", () => {
     expect(onSelectRoute).toHaveBeenCalledWith(1);
   });
 
-  it("expands and collapses a route detail through the controlled props", async () => {
-    const user = userEvent.setup();
-    const onToggleExpand = vi.fn();
-    const { rerender } = render(
-      <ResultsLayer {...props({ viewState: "full", expandedRouteId: null, onToggleExpand })} />,
-    );
+  it("no longer renders the detail inside the card", () => {
+    render(<ResultsLayer {...props({ viewState: "full" })} />);
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Ampliar ruta" }));
-    expect(onToggleExpand).toHaveBeenCalledWith(0);
-
-    rerender(
-      <ResultsLayer {...props({ viewState: "full", expandedRouteId: 0 })} />,
-    );
-    const dialog = screen.getByRole("dialog", { name: "Ruta 1" });
-    expect(dialog).toBeInTheDocument();
-    expect(within(dialog).getByRole("meter", { name: "Índice de condiciones" })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Contraer ruta" }));
-    rerender(
-      <ResultsLayer {...props({ viewState: "full", expandedRouteId: null })} />,
-    );
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ampliar ruta" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Ruta 1" })).not.toBeInTheDocument();
   });
 
   it("highlights the selected card", () => {

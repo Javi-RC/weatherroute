@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import AboutModal, { type AboutSection } from "./components/about/AboutModal";
 import HistorySheet from "./components/history/HistorySheet";
 import MapCanvas from "./components/map/MapCanvas";
@@ -70,7 +70,6 @@ function AppContent() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [aboutSection, setAboutSection] = useState<AboutSection | null>(null);
   const [selectedRouteId, setSelectedRouteId] = useState<number | null>(null);
-  const [expandedRouteId, setExpandedRouteId] = useState<number | null>(null);
   const [originLabel, setOriginLabel] = useState("");
   const [destinationLabel, setDestinationLabel] = useState("");
   const [originPoint, setOriginPoint] = useState<GeoPoint | null>(null);
@@ -135,11 +134,6 @@ function AppContent() {
     }
   });
 
-  const routeCount = result?.routes.length ?? 0;
-  useEffect(() => {
-    setExpandedRouteId((current) => (current === null || current < routeCount ? current : null));
-  }, [routeCount]);
-
   const mapRoutes = useMemo<MapRouteInput[]>(() => {
     if (!result) return [];
     return result.routes.map((route, index) =>
@@ -190,7 +184,6 @@ function AppContent() {
     setOriginPoint(search.originPoint);
     setDestinationPoint(search.destinationPoint);
     setSelectedRouteId(null);
-    setExpandedRouteId(null);
     setStatus("loading");
     try {
       mutation.mutate(request);
@@ -205,7 +198,6 @@ function AppContent() {
     refreshRequestRef.current = null;
     setRefreshing(false);
     setSelectedRouteId(null);
-    setExpandedRouteId(null);
     setStatus("loading");
     try {
       mutation.mutate(last);
@@ -248,12 +240,7 @@ function AppContent() {
     setOriginPoint(null);
     setDestinationPoint(null);
     setSelectedRouteId(null);
-    setExpandedRouteId(null);
     setStatus("idle");
-  }
-
-  function handleToggleExpand(index: number) {
-    setExpandedRouteId((current) => (current === index ? null : index));
   }
 
   function handleLocationError() {
@@ -288,13 +275,9 @@ function AppContent() {
               weatherAvailable={result?.weatherAvailable ?? true}
               routeAvailable={result?.routeAvailable ?? true}
               selectedRouteId={selectedRouteId}
-              expandedRouteId={expandedRouteId}
               onSelectRoute={setSelectedRouteId}
-              onToggleExpand={handleToggleExpand}
-              onCloseDetail={() => setExpandedRouteId(null)}
               onRetry={handleRetry}
               onNewSearch={handleNewSearch}
-              onHowCalculated={() => openAbout("score")}
               error={status === "error" ? ERROR_MESSAGE : null}
             />
           </div>

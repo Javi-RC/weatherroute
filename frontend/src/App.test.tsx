@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
@@ -199,19 +199,6 @@ describe("App", () => {
 
     emitLoad();
     expect(StubMarker.instances.map((marker) => marker.element?.textContent)).toEqual(["A", "B"]);
-  });
-
-  it("renders an expanded route detail with the index meter when the card is expanded", async () => {
-    mockFetch(() => analysisResponse());
-    renderApp();
-
-    await typeAndSearch();
-    await screen.findByText("Recomendada");
-
-    await userEvent.click(screen.getAllByRole("button", { name: "Ampliar ruta" })[0]);
-
-    const card = document.querySelector('[data-route-card][data-route-index="0"]')!;
-    expect(within(card as HTMLElement).getByRole("meter", { name: "Índice de condiciones" })).toBeInTheDocument();
   });
 
   it("auto-refreshes with a debounced re-analysis when only the activity changes, keeping results visible and replacing them atomically", async () => {
@@ -541,20 +528,6 @@ describe("App", () => {
     await userEvent.click(screen.getByRole("button", { name: "Cómo funciona" }));
 
     expect(screen.getByRole("dialog", { name: "Cómo funciona" })).toBeInTheDocument();
-  });
-
-  it("opens the About modal focused on the score section from ¿Cómo se calcula?", async () => {
-    mockFetch(() => analysisResponse());
-    renderApp();
-
-    await typeAndSearch();
-    await screen.findByText("Recomendada");
-    await userEvent.click(screen.getAllByRole("button", { name: "Ampliar ruta" })[0]);
-
-    await userEvent.click(screen.getAllByRole("button", { name: "¿Cómo se calcula?" })[0]);
-
-    expect(screen.getByRole("dialog", { name: "Cómo funciona" })).toBeInTheDocument();
-    expect(document.activeElement).toBe(document.getElementById("about-score"));
   });
 
   it("deletes a history entry from the sheet", async () => {

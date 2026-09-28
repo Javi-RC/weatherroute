@@ -129,6 +129,32 @@ underspecified in these places — the code is right, the plan was not:
   (the second branch of the handler) and "moves focus with the active mode",
   because neither `onChange` nor the focus move was covered by the plan's five.
 
+### Deviations found while executing Task 16 (2026-09-28)
+
+- **Three existing test files asserted the expand mechanism, so the plan's
+  "Expected: PASS" was wrong.** `RouteCard.test.tsx`, `ResultsLayer.test.tsx`
+  and `App.test.tsx` all drove `isExpanded` / `onToggleExpand` / the
+  `Ampliar ruta` chevron. They were rewritten for the new contract (roving
+  `tabIndex`, forwarded `onKeyDown`, no chevron, no detail region) instead of
+  being deleted wholesale.
+- **Two `App.test.tsx` cases were dropped, not migrated, and return in Task 18.**
+  "renders an expanded route detail with the index meter" and "opens the About
+  modal focused on the score section" both reached the detail through the
+  chevron. `RouteDetail` — and therefore `ScoreGauge`'s "¿Cómo se calcula?" —
+  is not rendered by anything between this task and Task 18's
+  `RouteDetailCard`, so there is no honest path to those assertions until the
+  card exists. This is a known, deliberate coverage gap of two cases.
+- **`ResultsLayerProps.onHowCalculated` was removed** (the plan only listed
+  `expandedRouteId` / `onToggleExpand` / `onCloseDetail`). Its only consumer was
+  `RouteDetail`, so leaving it would have left an unread destructured prop that
+  `noUnusedLocals` rejects. `App` re-wires it to `RouteDetailCard` in Task 18.
+- **`App`'s `routeCount` clamp effect is gone with the state it guarded.** It
+  only ever clamped `expandedRouteId`; re-pointing it at `selectedRouteId` would
+  have been an untested behaviour change inside a refactor task.
+- **`RouteList` also asserts the banner, the click path and the no-selection
+  tab order** — 10 cases, because the roving tabindex has two states (a
+  selection exists or not) and the plan only covered one.
+
 ---
 
 ## File Structure
@@ -2144,7 +2170,7 @@ git commit -m "feat: add the pick-mode toolbar over the map"
 
 **This task also removes the expand-in-place detail.** `RouteCard` currently renders a chevron `IconButton` and a `children` detail region, and `ResultsLayer` fills that with `RouteDetail`. In the new layout the selected route's detail lives in exactly one place — the floating `RouteDetailCard` over the map (desktop) or the bottom sheet (mobile) — so duplicating it inside the card is removed. That takes `expandedRouteId`, `onToggleExpand` and `onCloseDetail` out of `App` too.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it("lists one entry per route", () => {
@@ -2196,7 +2222,7 @@ it("no longer offers a per-card expand toggle", () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 npm test -- src/components/results/RouteList.test.tsx
@@ -2204,7 +2230,7 @@ npm test -- src/components/results/RouteList.test.tsx
 
 Expected: FAIL — module does not exist.
 
-- [ ] **Step 3: Implement `RouteList`**
+- [x] **Step 3: Implement `RouteList`**
 
 Move the `<ul data-testid="route-list">` block out of `ResultsLayer.tsx:78-100` into the new component and add the list-level key handler. `BestRouteBanner` takes only `routes` and `onNewSearch` — it already picks the best route itself via `findBestRouteIndex`.
 
@@ -2261,7 +2287,7 @@ export default function RouteList({
 }
 ```
 
-- [ ] **Step 4: Trim `RouteCard` and forward the new props**
+- [x] **Step 4: Trim `RouteCard` and forward the new props**
 
 `RouteCard` keeps `index, route, isSelected, weatherAvailable, onSelect`. Remove `isExpanded`, `onToggleExpand` and `children`, delete the chevron `IconButton` and the `isExpanded && …` region, and add the two new props:
 
@@ -2294,7 +2320,7 @@ With no route selected, every button gets `tabindex="-1"` and the list becomes u
 
 > `RouteCard` renders a `Card` wrapper (not a bare button), and `data-selected` is already on it — existing tests that query `[data-selected]` keep working.
 
-- [ ] **Step 5: Point `ResultsLayer` at the new component**
+- [x] **Step 5: Point `ResultsLayer` at the new component**
 
 Remove `expandedRouteId`, `onToggleExpand` and `onCloseDetail` from `ResultsLayerProps`, delete the `RouteDetail` import, and replace the `hasRoutes ? … : …` block with:
 
@@ -2316,7 +2342,7 @@ Remove `expandedRouteId`, `onToggleExpand` and `onCloseDetail` from `ResultsLaye
       )}
 ```
 
-- [ ] **Step 6: Run it**
+- [x] **Step 6: Run it**
 
 ```bash
 npm test && npm run typecheck
@@ -2324,7 +2350,7 @@ npm test && npm run typecheck
 
 Expected: PASS. `App.tsx` will now fail to typecheck on the removed `ResultsLayer` props — fix by deleting `expandedRouteId`, `handleToggleExpand` and the `onCloseDetail` argument from `App.tsx` in this task, so the suite is green before the next one.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/src/components/results/
