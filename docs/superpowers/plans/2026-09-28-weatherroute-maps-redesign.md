@@ -3493,7 +3493,7 @@ git commit -m "feat: announce map selections to screen readers"
 **Interfaces:**
 - Consumes: `rg` results proving nothing imports them.
 
-- [ ] **Step 1: Prove they are still unused**
+- [x] **Step 1: Prove they are still unused**
 
 ```bash
 rg -n "from \"recharts\"" frontend/src
@@ -3502,7 +3502,7 @@ rg -n "react-hook-form|@hookform/resolvers" frontend/src
 
 `recharts` **is** imported by Task 17. `react-hook-form` and `@hookform/resolvers` should return nothing.
 
-- [ ] **Step 2: Remove the unused ones**
+- [x] **Step 2: Remove the unused ones**
 
 ```bash
 npm uninstall react-hook-form @hookform/resolvers
@@ -3510,7 +3510,7 @@ npm uninstall react-hook-form @hookform/resolvers
 
 Keep `recharts`.
 
-- [ ] **Step 3: Verify the whole frontend gate**
+- [x] **Step 3: Verify the whole frontend gate**
 
 ```bash
 npm run typecheck && npm test && npm run build
@@ -3518,7 +3518,7 @@ npm run typecheck && npm test && npm run build
 
 Expected: all green.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/package.json frontend/package-lock.json
