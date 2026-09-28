@@ -94,6 +94,17 @@ underspecified in these places — the code is right, the plan was not:
   effect clear the cursor to `""`; without that assertion the crosshair would
   survive a mode switch.
 
+### Deviations found while executing Task 13 (2026-09-28)
+
+- **`ensureVisible` is tested against the world default first.** The maplibre
+  stub's `getBounds()` returns a degenerate box at the current centre and
+  `easeTo` moves that centre, so the "already visible" case has to be asserted
+  *before* the easing case; asserting it afterwards measured the moved camera,
+  not the visibility rule.
+- **`fitToRoutes` asserts the real bbox too** (`getWest`/`getNorth`), because
+  `fitBoundsCalls.length === 1` alone would pass if the handle framed the world
+  default.
+
 ---
 
 ## File Structure
@@ -1722,7 +1733,7 @@ export interface MapCanvasHandle {
 ```
 via `React.forwardRef`. Today `MapCanvas` is a plain default export used as `<MapCanvas … />`; converting to `forwardRef` keeps the same import path and JSX usage.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it("frames the routes on demand", async () => {
@@ -1756,7 +1767,7 @@ it("eases to a point only when it sits outside the viewport", async () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 npm test -- src/components/map/MapCanvas.test.tsx
@@ -1764,7 +1775,7 @@ npm test -- src/components/map/MapCanvas.test.tsx
 
 Expected: FAIL — `MapCanvasHandle` does not exist and `fitToRoutes` is undefined.
 
-- [ ] **Step 3: Convert to `forwardRef` and add the handle**
+- [x] **Step 3: Convert to `forwardRef` and add the handle**
 
 At the top of the file:
 ```ts
@@ -1826,7 +1837,7 @@ Add `hoveredRouteId` and `probePoint` to `MapCanvasProps` and to `PaintState` (b
 
 > `computeBounds` is still imported from `lib/map` — keep that import, Task 11 only removed its use from `paint()`.
 
-- [ ] **Step 4: Run it**
+- [x] **Step 4: Run it**
 
 ```bash
 npm test -- src/components/map/MapCanvas.test.tsx && npm run typecheck
@@ -1834,7 +1845,7 @@ npm test -- src/components/map/MapCanvas.test.tsx && npm run typecheck
 
 Expected: PASS. The JSX prop spread from `App.tsx` is unchanged, so no caller edits are needed yet.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/map/MapCanvas.tsx frontend/src/components/map/MapCanvas.test.tsx

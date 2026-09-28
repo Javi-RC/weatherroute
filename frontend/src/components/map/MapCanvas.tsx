@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
 import maplibregl, { type LngLatLike, type MapLayerMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { formatDistance, formatDuration, formatScore } from "../../lib/format";
-import { buildRouteFeatures, type GeoPoint, type MapRouteInput } from "../../lib/map";
+import { buildRouteFeatures, computeBounds, fitBoundsOptions, type GeoPoint, type MapRouteInput } from "../../lib/map";
 
 const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 const WORLD_CENTER: [number, number] = [0, 25];
@@ -13,6 +13,11 @@ const DIMMED_OPACITY = 0.3;
 const PROBE_LABEL = "•";
 
 export type PickMode = "origin" | "destination" | "none";
+
+export interface MapCanvasHandle {
+  fitToRoutes(): void;
+  ensureVisible(point: GeoPoint): void;
+}
 
 export interface MapCanvasProps {
   routes: MapRouteInput[];
@@ -38,18 +43,21 @@ interface PaintState {
   pickMode: PickMode;
 }
 
-export default function MapCanvas({
-  routes,
-  selectedRouteId,
-  onSelectRoute,
-  originPoint,
-  destinationPoint,
-  isCompact = false,
-  hoveredRouteId = null,
-  probePoint = null,
-  pickMode = "none",
-  onPickPoint,
-}: MapCanvasProps) {
+const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas(
+  {
+    routes,
+    selectedRouteId,
+    onSelectRoute,
+    originPoint,
+    destinationPoint,
+    isCompact = false,
+    hoveredRouteId = null,
+    probePoint = null,
+    pickMode = "none",
+    onPickPoint,
+  },
+  ref,
+) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const paintedRef = useRef(false);
@@ -238,8 +246,46 @@ export default function MapCanvas({
     paint(map);
   }, [paint, routes, selectedRouteId, originPoint, destinationPoint, isCompact, hoveredRouteId, probePoint]);
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      fitToRoutes() {
+        const map = mapRef.current;
+        if (!map) return;
+        const coords: GeoPoint[] = [];
+        for (const route of paintStateRef.current.routes) {
+          for (const [lng, lat] of route.geometry.coordinates) {
+            coords.push({ latitude: lat, longitude: lng });
+          }
+        }
+        if (coords.length === 0) return;
+        const bounds = computeBounds(coords);
+        if (!bounds) return;
+        map.fitBounds(
+          new maplibregl.LngLatBounds([bounds.west, bounds.south], [bounds.east, bounds.north]),
+          fitBoundsOptions({ isCompact: isCompactRef.current }),
+        );
+      },
+      ensureVisible(point) {
+        const map = mapRef.current;
+        if (!map) return;
+        const bounds = map.getBounds();
+        const inside =
+          point.longitude >= bounds.getWest() &&
+          point.longitude <= bounds.getEast() &&
+          point.latitude >= bounds.getSouth() &&
+          point.latitude <= bounds.getNorth();
+        if (inside) return;
+        map.easeTo({ center: [point.longitude, point.latitude], duration: 400 });
+      },
+    }),
+    [],
+  );
+
   return <div ref={containerRef} data-testid="map-canvas" className="absolute inset-0" />;
-}
+});
+
+export default MapCanvas;
 
 function routePopupHtml(route: MapRouteInput): string {
   const parts: string[] = [];

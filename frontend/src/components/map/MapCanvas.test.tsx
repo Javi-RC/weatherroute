@@ -1,4 +1,5 @@
 import { act, render } from "@testing-library/react";
+import { createRef } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { formatDistance, formatDuration, formatScore } from "../../lib/format";
 import type { MapRouteInput } from "../../lib/map";
@@ -8,7 +9,7 @@ import {
   Popup as StubPopup,
   type GeoJSONSource as StubGeoJSONSource,
 } from "../../../test/stubs/maplibre";
-import MapCanvas from "./MapCanvas";
+import MapCanvas, { type MapCanvasHandle } from "./MapCanvas";
 
 vi.mock("maplibre-gl", () => import("../../../test/stubs/maplibre"));
 
@@ -369,6 +370,54 @@ describe("MapCanvas", () => {
 
     act(() => map._emit("mouseleave", "route-lines", { point: { x: 0, y: 0 } }));
     expect(map.getCanvas().style.cursor).toBe("");
+  });
+
+  it("frames the routes on demand", () => {
+    const ref = createRef<MapCanvasHandle>();
+    render(
+      <MapCanvas
+        ref={ref}
+        routes={makeRoutes(2)}
+        selectedRouteId={null}
+        onSelectRoute={vi.fn()}
+      />,
+    );
+    const map = StubMap.instances.at(-1)!;
+    emitLoad(map);
+    map.fitBoundsCalls.length = 0;
+
+    act(() => ref.current?.fitToRoutes());
+
+    expect(map.fitBoundsCalls).toHaveLength(1);
+    expect(map.fitBoundsCalls[0].options).toMatchObject({ maxZoom: 14 });
+    expect(map.fitBoundsCalls[0].bounds.getWest()).toBeCloseTo(1.5);
+    expect(map.fitBoundsCalls[0].bounds.getNorth()).toBeCloseTo(42.6);
+  });
+
+  it("does nothing when fitting with no routes", () => {
+    const ref = createRef<MapCanvasHandle>();
+    render(<MapCanvas ref={ref} routes={[]} selectedRouteId={null} onSelectRoute={vi.fn()} />);
+    const map = StubMap.instances.at(-1)!;
+    emitLoad(map);
+    map.fitBoundsCalls.length = 0;
+
+    act(() => ref.current?.fitToRoutes());
+
+    expect(map.fitBoundsCalls).toHaveLength(0);
+  });
+
+  it("eases to a point only when it sits outside the viewport", () => {
+    const ref = createRef<MapCanvasHandle>();
+    render(<MapCanvas ref={ref} routes={[]} selectedRouteId={null} onSelectRoute={vi.fn()} />);
+    const map = StubMap.instances.at(-1)!;
+    emitLoad(map);
+
+    act(() => ref.current?.ensureVisible({ latitude: 25, longitude: 0 }));
+    expect(map.easeToCalls).toHaveLength(0);
+
+    act(() => ref.current?.ensureVisible({ latitude: 40.4168, longitude: -3.7038 }));
+    expect(map.easeToCalls).toHaveLength(1);
+    expect(map.easeToCalls[0]).toMatchObject({ center: [-3.7038, 40.4168] });
   });
 
   it("cleans up the map on unmount", () => {
