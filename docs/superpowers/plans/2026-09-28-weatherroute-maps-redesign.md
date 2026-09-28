@@ -66,6 +66,25 @@ underspecified in these places — the code is right, the plan was not:
 
 ---
 
+## Deviations found while executing Task 11 (2026-09-28)
+
+- **The `App.tsx` call site did change, in the test.** `App.test.tsx` asserted
+  `map.fitBoundsCalls.length > 0` after `load`, which was only true because
+  `MapCanvas` self-fitted. Task 11 makes the camera the caller's decision, so
+  that assertion moved out; Task 13 re-adds it against the imperative handle
+  instead of the component's internals.
+- **`PickMode` is declared in Task 11, not Task 12.** `MapCanvasProps` already
+  needed the type for the widened prop shape, so Task 12 wires the click
+  handler against the existing export instead of adding it.
+- **`onHoverRoute` lives in `MapCanvasProps` but is not destructured yet.**
+  `noUnusedLocals` fails the build on an unread destructured binding, so the
+  callback stays on the interface until Task 14 wires the `mousemove` handler.
+- **`hoveredRouteId` and `probePoint` are threaded through `PaintState`**, so
+  their repaint effect and the `route-hover` filter are already correct before
+  Task 14 provides a producer for them.
+
+---
+
 ## File Structure
 
 ### Backend — created
@@ -1381,7 +1400,7 @@ git commit -m "refactor: unify the desktop breakpoint in one module"
 
 Tasks 11–14 all rewrite `MapCanvas`. Land them one at a time with the suite green between, so a regression is attributable.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it("declares casing, hover and lines layers in that order", async () => {
@@ -1411,7 +1430,7 @@ it("does not reframe the map when only the selection changes", async () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 npm test -- src/components/map/MapCanvas.test.tsx
@@ -1419,7 +1438,7 @@ npm test -- src/components/map/MapCanvas.test.tsx
 
 Expected: FAIL — the old component declares `route-lines` + `route-selected` and refits on every prop change.
 
-- [ ] **Step 3: Rewrite the layer declaration and the paint function**
+- [x] **Step 3: Rewrite the layer declaration and the paint function**
 
 In `MapCanvas.tsx`, replace the `map.once("load", …)` body:
 
@@ -1499,7 +1518,7 @@ And replace `paint` so it **no longer calls `fitBounds`**:
 
 > Removing the `computeBounds` / `fitBounds` block is the point of this task. The camera becomes the caller's decision — Task 13 adds the handle. `MapRouteInput` literals in the old tests now need `selected: false`; the shared `route()` test helper should default it.
 
-- [ ] **Step 3b: Widen the prop and paint-state shapes now, so Tasks 12–14 only add behaviour**
+- [x] **Step 3b: Widen the prop and paint-state shapes now, so Tasks 12–14 only add behaviour**
 
 `MapCanvasProps` and `PaintState` both gain the three fields the later tasks need. Declare them in this task so the `paint()` above compiles:
 
@@ -1522,7 +1541,7 @@ Add the same two values to `PaintState`, default them to `null` in both the `use
 
 The `App.tsx` call site does not need to change yet — optional props with `null` defaults.
 
-- [ ] **Step 4: Run it**
+- [x] **Step 4: Run it**
 
 ```bash
 npm test -- src/components/map/MapCanvas.test.tsx && npm run typecheck
@@ -1530,7 +1549,7 @@ npm test -- src/components/map/MapCanvas.test.tsx && npm run typecheck
 
 Expected: PASS. The old "fits bounds on load" test is now wrong — **delete it** and replace it with "does not reframe the map when only the selection changes"; the new behaviour is that the caller fits.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/map/MapCanvas.tsx frontend/src/components/map/MapCanvas.test.tsx

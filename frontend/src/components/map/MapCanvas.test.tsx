@@ -62,8 +62,20 @@ describe("MapCanvas", () => {
     const map = StubMap.instances.at(-1)!;
 
     expect(map.getSource("routes")).toBeUndefined();
+    expect(map.getLayer("route-casing")).toBeUndefined();
+    expect(map.getLayer("route-hover")).toBeUndefined();
     expect(map.getLayer("route-lines")).toBeUndefined();
-    expect(map.getLayer("route-selected")).toBeUndefined();
+  });
+
+  it("declares casing, hover and lines layers in that order", () => {
+    render(<MapCanvas routes={makeRoutes(1)} selectedRouteId={null} onSelectRoute={vi.fn()} />);
+    const map = StubMap.instances.at(-1)!;
+
+    emitLoad(map);
+
+    expect([...map.layers.keys()]).toEqual(["route-casing", "route-hover", "route-lines"]);
+    expect(map.getLayer("route-casing")?.filter).toEqual(["==", ["get", "selected"], true]);
+    expect(map.getLayer("route-hover")?.filter).toEqual(["==", "$id", -1]);
   });
 
   it("adds source and layers exactly once after load, then paints the routes", () => {
@@ -74,13 +86,32 @@ describe("MapCanvas", () => {
 
     const source = map.getSource("routes") as StubGeoJSONSource;
     expect(source).toBeDefined();
+    expect(map.getLayer("route-casing")).toBeDefined();
+    expect(map.getLayer("route-hover")).toBeDefined();
     expect(map.getLayer("route-lines")).toBeDefined();
-    expect(map.getLayer("route-selected")).toBeDefined();
-    expect(map.controls.length).toBe(1);
+    expect(map.controls.length).toBe(2);
 
     const data = source.getData() as { type: string; features: unknown[] };
     expect(data.type).toBe("FeatureCollection");
     expect(data.features).toHaveLength(2);
+  });
+
+  it("paints the selected route at full opacity and the rest dimmed", () => {
+    render(
+      <MapCanvas
+        routes={[route({ selected: true }), route({ selected: false })]}
+        selectedRouteId={0}
+        onSelectRoute={vi.fn()}
+      />,
+    );
+    const map = StubMap.instances.at(-1)!;
+
+    emitLoad(map);
+
+    const source = map.getSource("routes") as StubGeoJSONSource;
+    const features = (source.getData() as { features: Array<{ properties: { selected: boolean } }> }).features;
+    expect(features[0].properties.selected).toBe(true);
+    expect(features[1].properties.selected).toBe(false);
   });
 
   it("repaints via setData on route changes without re-declaring layers", () => {
@@ -106,23 +137,18 @@ describe("MapCanvas", () => {
     expect(data.features).toHaveLength(4);
   });
 
-  it("fitBounds to the routes bbox (never the world default) when routes exist", () => {
-    render(<MapCanvas routes={makeRoutes(1)} selectedRouteId={null} onSelectRoute={vi.fn()} />);
+  it("never reframes the map on its own", () => {
+    const { rerender } = render(
+      <MapCanvas routes={makeRoutes(1)} selectedRouteId={null} onSelectRoute={vi.fn()} />,
+    );
     const map = StubMap.instances.at(-1)!;
 
     emitLoad(map);
+    expect(map.fitBoundsCalls).toHaveLength(0);
 
-    expect(map.fitBoundsCalls).toHaveLength(1);
-    const { bounds, options } = map.fitBoundsCalls[0];
-    expect(bounds.getWest()).toBeCloseTo(1.5);
-    expect(bounds.getEast()).toBeCloseTo(1.7);
-    expect(bounds.getSouth()).toBeCloseTo(42.5);
-    expect(bounds.getNorth()).toBeCloseTo(42.6);
-    expect(options?.maxZoom).toBe(14);
-    expect(bounds.getWest()).not.toBeCloseTo(0);
-    expect(options?.padding).toEqual(
-      expect.objectContaining({ top: 32, right: 32, bottom: 32, left: 412 }),
-    );
+    rerender(<MapCanvas routes={makeRoutes(3)} selectedRouteId={2} onSelectRoute={vi.fn()} />);
+
+    expect(map.fitBoundsCalls).toHaveLength(0);
   });
 
   it("skips fitBounds when there are no routes", () => {
@@ -133,18 +159,16 @@ describe("MapCanvas", () => {
     expect(map.fitBoundsCalls).toHaveLength(0);
   });
 
-  it("updates the route-selected filter when the selection changes", () => {
+  it("keeps the casing filter on the selected property when the selection changes", () => {
     const { rerender } = render(<MapCanvas routes={makeRoutes(3)} selectedRouteId={null} onSelectRoute={vi.fn()} />);
     const map = StubMap.instances.at(-1)!;
     emitLoad(map);
 
-    expect(map.getLayer("route-selected")?.filter).toEqual(["==", "$id", -1]);
+    expect(map.getLayer("route-casing")?.filter).toEqual(["==", ["get", "selected"], true]);
 
     rerender(<MapCanvas routes={makeRoutes(3)} selectedRouteId={1} onSelectRoute={vi.fn()} />);
-    expect(map.getLayer("route-selected")?.filter).toEqual(["==", "$id", 1]);
 
-    rerender(<MapCanvas routes={makeRoutes(3)} selectedRouteId={null} onSelectRoute={vi.fn()} />);
-    expect(map.getLayer("route-selected")?.filter).toEqual(["==", "$id", -1]);
+    expect(map.getLayer("route-casing")?.filter).toEqual(["==", ["get", "selected"], true]);
   });
 
   it("places A/B marker chips for origin and destination", () => {
@@ -236,16 +260,13 @@ describe("MapCanvas", () => {
     expect(popup.html).toContain("B &quot;quote&quot;");
   });
 
-  it("keeps a single map instance when isCompact flips and only re-fits bounds", () => {
+  it("keeps a single map instance when isCompact flips", () => {
     const { rerender } = render(
       <MapCanvas routes={makeRoutes(1)} selectedRouteId={null} onSelectRoute={vi.fn()} isCompact={false} />,
     );
     const map = StubMap.instances.at(-1)!;
     emitLoad(map);
     expect(StubMap.instances).toHaveLength(1);
-    expect(map.fitBoundsCalls[0].options?.padding).toEqual(
-      expect.objectContaining({ top: 32, bottom: 32 }),
-    );
 
     rerender(
       <MapCanvas routes={makeRoutes(1)} selectedRouteId={null} onSelectRoute={vi.fn()} isCompact />,
@@ -253,10 +274,7 @@ describe("MapCanvas", () => {
 
     expect(StubMap.instances).toHaveLength(1);
     expect(StubMap.instances[0].removed).toBe(false);
-    expect(map.fitBoundsCalls).toHaveLength(2);
-    expect(map.fitBoundsCalls[1].options?.padding).toEqual(
-      expect.objectContaining({ top: 64, right: 24, bottom: 320, left: 24 }),
-    );
+    expect(map.fitBoundsCalls).toHaveLength(0);
   });
 
   it("does not render a bare arrow in the popup when one label is empty", () => {

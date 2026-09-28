@@ -198,8 +198,6 @@ describe("App", () => {
     expect(bestCard).toHaveAttribute("data-selected", "true");
 
     emitLoad();
-    const map = StubMap.instances.at(-1)!;
-    expect(map.fitBoundsCalls.length).toBeGreaterThan(0);
     expect(StubMarker.instances.map((marker) => marker.element?.textContent)).toEqual(["A", "B"]);
   });
 
