@@ -2,9 +2,16 @@ export type ActivityType = "Walking" | "Running" | "Cycling" | "Motorcycle" | "D
 
 export type RiskLevel = "Low" | "Moderate" | "High" | "Severe";
 
+export interface GeoCoordinates {
+  latitude: number;
+  longitude: number;
+}
+
 export interface AnalyzeRequest {
-  origin: string;
-  destination: string;
+  origin?: string | null;
+  destination?: string | null;
+  originCoordinates?: GeoCoordinates | null;
+  destinationCoordinates?: GeoCoordinates | null;
   activity: ActivityType;
   departureTime: string;
   maxDurationMinutes?: number | null;

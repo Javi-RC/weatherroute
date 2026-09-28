@@ -88,13 +88,15 @@ function AppContent() {
     onSuccess: (data, variables) => {
       const intent = intentRef.current;
       if (!intent || intent.request !== variables) return;
-      history.save({
-        origin: intent.request.origin,
-        destination: intent.request.destination,
-        activity: intent.request.activity,
-        departureTimeUtc: intent.request.departureTime,
-        maxDurationMinutes: intent.request.maxDurationMinutes ?? null,
-      });
+      if (intent.request.origin && intent.request.destination) {
+        history.save({
+          origin: intent.request.origin,
+          destination: intent.request.destination,
+          activity: intent.request.activity,
+          departureTimeUtc: intent.request.departureTime,
+          maxDurationMinutes: intent.request.maxDurationMinutes ?? null,
+        });
+      }
       setResult(data);
       setStatus(data.status);
       if (data.status === "partial") {
