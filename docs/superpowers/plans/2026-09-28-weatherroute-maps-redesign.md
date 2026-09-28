@@ -179,6 +179,37 @@ underspecified in these places — the code is right, the plan was not:
   `formatter` / `labelFormatter` read the `Point` the chart was given and the
   plan's `(entry.payload as Point)[config.field]` shape is preserved.
 
+### Deviations found while executing Task 18 (2026-09-28)
+
+- **The plan's `RouteDetailCard` interface and its own call site disagree about
+  `weatherAvailable`.** The interface (Step 3) declares it required, while the
+  Task 20 call site renders `<RouteDetailCard route={selectedRoute} … />`
+  without it, and so do the plan's two tests. It is now optional and defaults to
+  `true`, which satisfies all three.
+- **`SegmentStrip` is no longer gated on `weatherAvailable`; the warning is
+  added instead.** The plan rendered the strip only when weather was available,
+  which would hide the arrival times — still known — for every route. The card
+  always renders the strip (it already degrades to "Sin datos
+  meteorológicos" per segment) and shows the amber `role="status"` warning that
+  the deleted `RouteDetail` used to show.
+- **`onHowCalculated` goes to `ScoreGauge` only.** `FactorList` also renders a
+  "¿Cómo se calcula?" button when the prop is passed, so forwarding it to both
+  put two identically named buttons in a 26rem card. The plan's own markup passed
+  it to `ScoreGauge` alone, so that is what the card does.
+- **`FactorList` is not given a heading** — the card stacks it under the gauge,
+  matching the plan's markup, so the two are read in order without inventing a
+  section title the design does not specify.
+- **`MapControlBar` renders `<MapLegend />` with no props**, per the plan's
+  instruction to check the real prop name: `MapLegend` takes none. `compact`
+  only positions the cluster (`left-1/2 -translate-x-1/2` on mobile,
+  `left-4` on desktop) and the bar carries its own `absolute bottom-4 z-20`
+  because the plan's snippet left the positioning half-written.
+- **8 cases instead of the plan's 2**: header distance/duration, the factors and
+  segment strip, `onClose`, `onHowCalculated`, a real profile-hover wiring
+  assertion (with the same `ResponsiveContainer` stub Task 17 needed, so the
+  chart is measurable) and the missing-weather case. The plan's
+  "renders nothing when no route is selected" case is kept verbatim.
+
 ---
 
 ## File Structure
@@ -2591,7 +2622,7 @@ git commit -m "feat: add a weather profile chart for the selected route"
 - Consumes: `route: RouteCandidate | null`, `segments`, `onHoverSegment`, `onClose`, `onHowCalculated`.
 - Produces: the floating bottom-left card over the map, and the bottom-right control cluster (legend + scale).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 it("shows the selected route with its score and profile", () => {
@@ -2615,7 +2646,7 @@ it("renders nothing when no route is selected", () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 npm test -- src/components/map/RouteDetailCard.test.tsx
@@ -2623,7 +2654,7 @@ npm test -- src/components/map/RouteDetailCard.test.tsx
 
 Expected: FAIL — module does not exist.
 
-- [ ] **Step 3: Implement `RouteDetailCard`**
+- [x] **Step 3: Implement `RouteDetailCard`**
 
 ```tsx
 import type { RouteCandidate } from "../../types";
@@ -2672,7 +2703,7 @@ export default function RouteDetailCard({
 
 Use the existing `IconButton` primitive and the `formatDistance` / `formatDuration` formatters rather than hand-rolled markup, and import `FaTimes` from `react-icons/fa` (the repo standard). Read `RouteDetail.tsx` first and copy the exact `SegmentStrip` / `FactorList` prop names out of it rather than assuming.
 
-- [ ] **Step 4: Implement `MapControlBar`**
+- [x] **Step 4: Implement `MapControlBar`**
 
 ```tsx
 import MapLegend from "./MapLegend";
@@ -2697,7 +2728,7 @@ export default function MapControlBar({ compact }: MapControlBarProps) {
 
 Check `MapLegend`'s real prop name — the desktop call site is `<MapLegend />` with no props today.
 
-- [ ] **Step 5: Delete `RouteDetail.tsx` and its test, then fix the fallout**
+- [x] **Step 5: Delete `RouteDetail.tsx` and its test, then fix the fallout**
 
 ```bash
 git rm frontend/src/components/results/RouteDetail.tsx frontend/src/components/results/RouteDetail.test.tsx
@@ -2706,7 +2737,7 @@ npm test
 
 Expected: PASS. Task 16 already removed the only import (`ResultsLayer`). `App.tsx` does not import it directly.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/components/map/
