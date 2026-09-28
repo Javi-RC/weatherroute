@@ -31,7 +31,7 @@ public class CachedCalculateRouteUseCaseTests
                 new[] { new RouteCandidate("p", 74, 168, RiskLevel.Low, 88, Array.Empty<RiskFactor>(), Array.Empty<SegmentResult>(), Array.Empty<Coordinates>()) });
         });
         var useCase = new CachedCalculateRouteUseCase(inner, new MemoryDistributedCache(Microsoft.Extensions.Options.Options.Create(new MemoryDistributedCacheOptions())), Options, Json);
-        var command = new CalculateRouteCommand("A", "B", ActivityType.Cycling, new DateTime(2026, 9, 27, 8, 0, 0, DateTimeKind.Utc));
+        var command = new CalculateRouteCommand("A", "B", null, null, ActivityType.Cycling, new DateTime(2026, 9, 27, 8, 0, 0, DateTimeKind.Utc));
 
         await useCase.ExecuteAsync(command);
         await useCase.ExecuteAsync(command);
@@ -50,8 +50,8 @@ public class CachedCalculateRouteUseCaseTests
         });
         var useCase = new CachedCalculateRouteUseCase(inner, new MemoryDistributedCache(Microsoft.Extensions.Options.Options.Create(new MemoryDistributedCacheOptions())), Options, Json);
 
-        await useCase.ExecuteAsync(new CalculateRouteCommand("A", "B", ActivityType.Cycling, new DateTime(2026, 9, 27, 8, 0, 0, DateTimeKind.Utc)));
-        await useCase.ExecuteAsync(new CalculateRouteCommand("B", "A", ActivityType.Cycling, new DateTime(2026, 9, 27, 8, 0, 0, DateTimeKind.Utc)));
+        await useCase.ExecuteAsync(new CalculateRouteCommand("A", "B", null, null, ActivityType.Cycling, new DateTime(2026, 9, 27, 8, 0, 0, DateTimeKind.Utc)));
+        await useCase.ExecuteAsync(new CalculateRouteCommand("B", "A", null, null, ActivityType.Cycling, new DateTime(2026, 9, 27, 8, 0, 0, DateTimeKind.Utc)));
 
         Assert.Equal(2, calls);
     }
@@ -87,7 +87,7 @@ public class CachedCalculateRouteUseCaseTests
     }
 
     private static CalculateRouteCommand CalculateRouteCommand_() =>
-        new("Ciudad Real", "Almagro", ActivityType.Cycling, new DateTime(2026, 9, 27, 8, 0, 0, DateTimeKind.Utc));
+        new("Ciudad Real", "Almagro", null, null, ActivityType.Cycling, new DateTime(2026, 9, 27, 8, 0, 0, DateTimeKind.Utc));
 
     [Theory]
     [InlineData(10, 30, 0)]        

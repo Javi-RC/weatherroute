@@ -37,8 +37,8 @@ public sealed class CalculateRouteUseCase : ICalculateRouteUseCase
         var start = Stopwatch.GetTimestamp();
         try
         {
-            var origin = await _geocoding.GeocodeAsync(command.Origin, ct);
-            var destination = await _geocoding.GeocodeAsync(command.Destination, ct);
+            var origin = command.OriginCoordinates ?? await GeocodeAsync(command.Origin, ct);
+            var destination = command.DestinationCoordinates ?? await GeocodeAsync(command.Destination, ct);
             var external = await _routes.CalculateRoutesAsync(origin, destination, command.Activity, 2, ct);
 
             var candidates = new List<RouteCandidate>();
@@ -107,6 +107,13 @@ public sealed class CalculateRouteUseCase : ICalculateRouteUseCase
         {
             CoreApiDuration.Record(Stopwatch.GetElapsedTime(start).TotalMilliseconds);
         }
+    }
+
+    private async Task<Coordinates> GeocodeAsync(string? place, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(place))
+            throw new ArgumentException("Neither a place name nor coordinates were provided.", nameof(place));
+        return await _geocoding.GeocodeAsync(place, ct);
     }
 
     private static string? Recommend(IReadOnlyList<RouteCandidate> candidates)
