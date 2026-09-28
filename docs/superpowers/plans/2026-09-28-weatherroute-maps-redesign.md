@@ -55,6 +55,14 @@ underspecified in these places — the code is right, the plan was not:
   — each of the three plan steps leaves a red build on its own.
 - **The analyze integration tests need no Docker.** They are untagged and run in
   the fast suite, so the `Category=Integration` gate is not required for them.
+- **`MapRouteInput.selected` is required, so the wiring lands in the same commit.**
+  The plan made Task 7 leave `tsc` red until Task 11; instead `App.tsx` now passes
+  `index === selectedRouteId` (`selectedRouteId` is an **index**, not a
+  `providerId`) and two existing `MapCanvas.test.tsx` padding assertions moved to
+  the new desktop padding. Every commit is green.
+- **The Task 9 `update()` does not call `writeState` inside the `setState`
+  updater.** React may invoke an updater twice, so the merge happens against a
+  ref and `replaceState` is called once from the event handler.
 
 ---
 
@@ -752,7 +760,7 @@ git commit -m "test: cover coordinate-based analyze requests end to end"
 
 **This task must land before any `MapCanvas` test, or every `MapCanvas.test.tsx` and `App.test.tsx` case breaks.**
 
-- [ ] **Step 1: Add the camera and canvas methods to `MapStub`**
+- [x] **Step 1: Add the camera and canvas methods to `MapStub`**
 
 Insert after `isStyleLoaded()` in `frontend/test/stubs/maplibre.ts`:
 ```ts
@@ -811,7 +819,7 @@ Insert after `isStyleLoaded()` in `frontend/test/stubs/maplibre.ts`:
   }
 ```
 
-- [ ] **Step 2: Give each instance a canvas and reset the new fields**
+- [x] **Step 2: Give each instance a canvas and reset the new fields**
 
 Replace the constructor body:
 ```ts
@@ -829,7 +837,7 @@ Replace the constructor body:
   }
 ```
 
-- [ ] **Step 3: Add the two controls and export them**
+- [x] **Step 3: Add the two controls and export them**
 
 Next to `export class NavigationControl {}`:
 ```ts
@@ -854,7 +862,7 @@ export class GeolocateControl {
 
 Add both to the `maplibregl` default export object.
 
-- [ ] **Step 4: Run the frontend suite — nothing should break**
+- [x] **Step 4: Run the frontend suite — nothing should break**
 
 ```bash
 npm test
@@ -862,7 +870,7 @@ npm test
 
 Expected: PASS with the same pass count as before this task. The stub is purely additive.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/test/stubs/maplibre.ts
@@ -881,7 +889,7 @@ git commit -m "test: extend the maplibre stub with camera, canvas and feature qu
 - Produces: `MapRouteInput` gains `selected: boolean`; `RouteFeatureProperties` gains `selected: boolean`.
 - Produces: `fitBoundsOptions({ isCompact })` returns `left: 412` on desktop so routes are not framed underneath the sidebar.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `frontend/src/lib/map.test.ts`:
 ```ts
@@ -908,7 +916,7 @@ it("keeps the mobile padding for the bottom sheet", () => {
 
 Export `SIDEBAR_PADDING = 412` from `map.ts` so the test and the layout cannot drift apart.
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 npm test -- src/lib/map.test.ts
@@ -916,7 +924,7 @@ npm test -- src/lib/map.test.ts
 
 Expected: FAIL — `selected` is absent and `padding.left` is 64.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `frontend/src/lib/map.ts`:
 
@@ -965,7 +973,7 @@ export function fitBoundsOptions(view: MapView): FitBoundsOptions {
 }
 ```
 
-- [ ] **Step 4: Run it**
+- [x] **Step 4: Run it**
 
 ```bash
 npm test -- src/lib/map.test.ts && npm run typecheck
@@ -973,7 +981,7 @@ npm test -- src/lib/map.test.ts && npm run typecheck
 
 Expected: PASS. `typecheck` will report every `MapRouteInput` literal missing `selected` — that is expected; Task 11 fixes them.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/lib/map.ts frontend/src/lib/map.test.ts
@@ -992,7 +1000,7 @@ git commit -m "feat: mark selected routes in features and pad the fit clear of t
 - Produces: `AnalyzeRequest.origin?: string | null`, `AnalyzeRequest.destination?: string | null`, plus `originCoordinates?: GeoCoordinates | null` and `destinationCoordinates?: GeoCoordinates | null`, where `GeoCoordinates = { latitude: number; longitude: number }`.
 - This is the exact shape the backend `CoordinatesDto` expects — do not invent a `{ lat, lon }` variant here. Note the asymmetry with `GeocodeResult`, which *does* use `lat`/`lon` because it is the API's own response shape.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 it("sends coordinates in the analyze body", async () => {
@@ -1014,7 +1022,7 @@ it("sends coordinates in the analyze body", async () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 npm test -- src/services/api.test.ts
@@ -1022,7 +1030,7 @@ npm test -- src/services/api.test.ts
 
 Expected: FAIL — the fields do not exist on `AnalyzeRequest`.
 
-- [ ] **Step 3: Extend the type**
+- [x] **Step 3: Extend the type**
 
 In `frontend/src/types.ts`:
 ```ts
@@ -1044,7 +1052,7 @@ export interface AnalyzeRequest {
 
 `services/api.ts` needs **no change** — it already `JSON.stringify`s the request object as the body.
 
-- [ ] **Step 4: Run it and fix downstream type errors**
+- [x] **Step 4: Run it and fix downstream type errors**
 
 ```bash
 npm test -- src/services/api.test.ts
@@ -1053,7 +1061,7 @@ npm run typecheck
 
 Expected: the new test passes. `typecheck` will flag `App.tsx:147-153` (it builds an `AnalyzeRequest` with `origin`/`destination` as required strings — still valid, since the fields remain assignable) and `useRecentSearches`/`storage.ts` if they mirror the shape. Fix by inspection, do not paper over with `any`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/types.ts frontend/src/services/api.test.ts
@@ -1090,7 +1098,7 @@ export function useUrlState(): {
 
 **No router dependency.** The app has exactly one page; `react-router-dom` would be dead weight.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 import { act, renderHook } from "@testing-library/react";
@@ -1176,7 +1184,7 @@ it("re-reads the query string on popstate", () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 npm test -- src/hooks/useUrlState.test.ts
@@ -1184,7 +1192,7 @@ npm test -- src/hooks/useUrlState.test.ts
 
 Expected: FAIL — module does not exist.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `frontend/src/hooks/useUrlState.ts`:
 ```ts
@@ -1297,7 +1305,7 @@ export function useUrlState() {
 }
 ```
 
-- [ ] **Step 4: Run it**
+- [x] **Step 4: Run it**
 
 ```bash
 npm test -- src/hooks/useUrlState.test.ts && npm run typecheck
@@ -1305,7 +1313,7 @@ npm test -- src/hooks/useUrlState.test.ts && npm run typecheck
 
 Expected: PASS, 7 cases.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/hooks/useUrlState.ts frontend/src/hooks/useUrlState.test.ts
@@ -1323,7 +1331,7 @@ git commit -m "feat: add useUrlState for shareable route links"
 - Produces: `export const DESKTOP_QUERY = "(min-width: 1024px)"` and `export function useIsDesktop(): boolean` (backed by the existing `useMediaQuery`).
 - Consumed by: `AppShell`, `Sidebar`, `MapCanvas`, `RouteDetailCard`, `App`.
 
-- [ ] **Step 1: Write the file**
+- [x] **Step 1: Write the file**
 
 ```ts
 import { useMediaQuery } from "./useMediaQuery";
@@ -1335,7 +1343,7 @@ export function useIsDesktop(): boolean {
 }
 ```
 
-- [ ] **Step 2: Verify the two call sites agree**
+- [x] **Step 2: Verify the two call sites agree**
 
 ```bash
 rg -n "min-width: (768|1024)px" frontend/src
@@ -1343,7 +1351,7 @@ rg -n "min-width: (768|1024)px" frontend/src
 
 Expected after this task: only `DESKTOP_QUERY` in `breakpoints.ts` remains. Fix `RouteDetail.tsx:17` (which uses 768px) and `App.tsx:32` to import from this module. The mobile bottom-sheet padding in `lib/map.ts` is a layout constant, not a breakpoint query — leave it.
 
-- [ ] **Step 3: Run the suite**
+- [x] **Step 3: Run the suite**
 
 ```bash
 npm test && npm run typecheck
@@ -1351,7 +1359,7 @@ npm test && npm run typecheck
 
 Expected: PASS. The `RouteDetail` change may alter a jsdom `matchMedia` mock in a component test; if a test fails because jsdom returns `false` for every query, set the mock to return `true` for the 1024px query in that test rather than weakening the code.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/lib/breakpoints.ts frontend/src/App.tsx frontend/src/components/results/RouteDetail.tsx
