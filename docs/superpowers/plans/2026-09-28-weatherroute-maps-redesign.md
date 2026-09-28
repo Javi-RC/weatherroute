@@ -155,6 +155,30 @@ underspecified in these places — the code is right, the plan was not:
   tab order** — 10 cases, because the roving tabindex has two states (a
   selection exists or not) and the plan only covered one.
 
+### Deviations found while executing Task 17 (2026-09-28)
+
+- **The plan's `activeDot` cast reads the wrong argument in Recharts 3.10.1.**
+  `adaptEventHandlers` (`es6/util/types.js`) calls an object-form `activeDot`
+  handler as `handler(dotProps, event)`, so the plan's
+  `(_: unknown, payload: unknown) => onHoverSegment((payload as Point).index)`
+  indexes a React synthetic event and always yields `undefined`. The hover is
+  wired through the static `dot` prop instead, typed with the library's own
+  exported `DotItemDotProps` (no `as any`): every plotted point is hoverable,
+  and the wiring is reachable in jsdom because the `activeDot` path only renders
+  once the tooltip machinery has an active index.
+- **`ResponsiveContainer` is replaced in the test file** with a stub that injects
+  a fixed `width`/`height` into the chart. jsdom reports a 0×0 container, so the
+  real one renders nothing and neither the chart nor the dots exist; the stub
+  stands in for the browser measurement and nothing else.
+- **`toProfilePoints` is exported and unit-tested directly** (accumulated
+  distance, null weather, UTC arrival label) instead of asserting the `img`
+  wrapper exists, which the plan's "accumulates the distance along the x axis"
+  case did.
+- **The tooltip indexes the plotted fields, not the raw weather keys.** Each
+  metric config carries `field: "temperature" | "precipitation" | "wind"`, so
+  `formatter` / `labelFormatter` read the `Point` the chart was given and the
+  plan's `(entry.payload as Point)[config.field]` shape is preserved.
+
 ---
 
 ## File Structure
@@ -2370,7 +2394,7 @@ git commit -m "feat: extract the route list, add keyboard navigation, drop expan
 - Produces: `onHoverSegment(index: number | null): void` — drives the map's `probePoint`.
 - Uses the existing `SegmentedControl` for the metric switch. **One metric on the Y axis at a time**: three overlaid axes is unreadable, and the tooltip carries all three.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 const segments: RouteSegment[] = [
@@ -2412,7 +2436,7 @@ it("renders nothing but a note when there is no weather", () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 npm test -- src/components/results/RouteProfileChart.test.tsx
@@ -2420,7 +2444,7 @@ npm test -- src/components/results/RouteProfileChart.test.tsx
 
 Expected: FAIL — module does not exist.
 
-- [ ] **Step 3: Install the accumulated-distance helper in the component**
+- [x] **Step 3: Install the accumulated-distance helper in the component**
 
 ```tsx
 import { useMemo, useState } from "react";
@@ -2471,7 +2495,7 @@ export function toProfilePoints(segments: RouteSegment[]): Point[] {
 }
 ```
 
-- [ ] **Step 4: Render it**
+- [x] **Step 4: Render it**
 
 ```tsx
 export default function RouteProfileChart({ segments, onHoverSegment }: RouteProfileChartProps) {
@@ -2538,7 +2562,7 @@ export default function RouteProfileChart({ segments, onHoverSegment }: RoutePro
 
 > Recharts renders responsively and measures its container; in jsdom the container is 0×0, so assert on the `role="img"` wrapper and the toolbar rather than on pixel geometry. That is why every test above queries the wrapper, not the SVG.
 
-- [ ] **Step 5: Run it**
+- [x] **Step 5: Run it**
 
 ```bash
 npm test -- src/components/results/RouteProfileChart.test.tsx && npm run typecheck
@@ -2546,7 +2570,7 @@ npm test -- src/components/results/RouteProfileChart.test.tsx && npm run typeche
 
 Expected: PASS. If Recharts' `activeDot` callback signature differs in v3, read `node_modules/recharts/types/index.d.ts` and adjust the cast — do not add `as any`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/components/results/RouteProfileChart.tsx frontend/src/components/results/RouteProfileChart.test.tsx
