@@ -25,6 +25,39 @@
 
 ---
 
+## Deviations found while executing Tasks 1–5 (2026-09-28)
+
+Tasks 1–5 shipped in `c3c1056` and `13337cb`. The plan text was wrong or
+underspecified in these places — the code is right, the plan was not:
+
+- **`GeocodingException` is not usable from Application.** It lives in
+  `WeatherRoute.Infrastructure/Routing`, and Application must not reference
+  Infrastructure. `CalculateRouteUseCase.GeocodeAsync` throws
+  `ArgumentException` instead. Do not "fix" this by moving the exception.
+- **The validator must keep the error keys `Origin` / `Destination`.**
+  `RouteAnalyzeTests.Empty_Origin_Returns_ValidationProblem` and the frontend
+  read them, so the rules are `RuleFor(x => x.Origin).MaximumLength(200).NotEmpty().When(x => x.OriginCoordinates is null)`
+  rather than a `RuleFor(x => x)` with a lowercase `WithName`.
+- **Test projects have no `Nullable` enable.** Every new test file starts with
+  `#nullable enable` (see `Fakes.cs:1`), otherwise `string?` is `error CS8632`
+  under `-warnaserror`.
+- **Test files are flat.** There is no `WeatherRoute.Api.UnitTests` and no
+  subfolders: the validator tests live in
+  `tests/WeatherRoute.Api.IntegrationTests/CalculateRouteRequestValidatorTests.cs`
+  (untagged — a pure validator test needs no host) and the others beside their
+  existing siblings. Namespaces stay `WeatherRoute.<Layer>.Tests`.
+- **`/routes/analyses` has no validator**, so it answers a missing endpoint with
+  a `400` `ValidationProblem` instead of throwing (the plan threw, which would
+  have surfaced as a 500), and persists `"lat,lon"` as the label when only
+  coordinates were given.
+- **Tasks 1–4 are one commit.** `CalculateRouteRequest` cannot be nullable
+  without the command, the use case and `BuildKey` changing in the same commit
+  — each of the three plan steps leaves a red build on its own.
+- **The analyze integration tests need no Docker.** They are untagged and run in
+  the fast suite, so the `Category=Integration` gate is not required for them.
+
+---
+
 ## File Structure
 
 ### Backend — created
@@ -93,7 +126,7 @@
 - Produces: `WeatherRoute.Api.Requests.CoordinatesDto(double Latitude, double Longitude)`.
 - Produces: `CalculateRouteRequest(string? Origin, string? Destination, ActivityType Activity, DateTime DepartureTime, CoordinatesDto? OriginCoordinates = null, CoordinatesDto? DestinationCoordinates = null, int? MaxDurationMinutes = null)`.
 
-- [ ] **Step 1: Write the DTO**
+- [x] **Step 1: Write the DTO**
 
 `backend/WeatherRoute.Api/Requests/CoordinatesDto.cs`:
 ```csharp
@@ -102,7 +135,7 @@ namespace WeatherRoute.Api.Requests;
 public sealed record CoordinatesDto(double Latitude, double Longitude);
 ```
 
-- [ ] **Step 2: Change the request record**
+- [x] **Step 2: Change the request record**
 
 `backend/WeatherRoute.Api/Requests/CalculateRouteRequest.cs` — the whole file:
 ```csharp
@@ -122,7 +155,7 @@ public sealed record CalculateRouteRequest(
 
 Optional parameters come last so C# accepts the defaults. The JSON property names are `originCoordinates` / `destinationCoordinates` under the default camelCase policy.
 
-- [ ] **Step 3: Build the API project and fix the fallout**
+- [x] **Step 3: Build the API project and fix the fallout**
 
 ```bash
 dotnet build backend/WeatherRoute.slnx --no-restore
@@ -130,7 +163,7 @@ dotnet build backend/WeatherRoute.slnx --no-restore
 
 Expect errors in `RouteEndpoints.cs` (it passes `request.Origin` into a `string?` slot — that still compiles) and in the validator (`RuleFor(x => x.Origin).NotEmpty()` on a nullable now warns/errs under `-warnaserror`). Record the exact list; Task 2 and Task 3 resolve them. Do not proceed with a red build.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add backend/WeatherRoute.Api/Requests/
@@ -149,7 +182,7 @@ git commit -m "feat: accept optional coordinates in the analyze request"
 - Consumes: `CoordinatesDto`, the new `CalculateRouteRequest`.
 - Produces: `CalculateRouteRequestValidator` rejecting an endpoint that has neither text nor coordinates, and rejecting out-of-range coordinates with `400` + `ProblemDetails`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```csharp
 using FluentValidation;
@@ -251,7 +284,7 @@ public sealed class CalculateRouteRequestValidatorTests
 }
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 dotnet test backend/WeatherRoute.slnx --filter "FullyQualifiedName~CalculateRouteRequestValidatorTests"
@@ -259,7 +292,7 @@ dotnet test backend/WeatherRoute.slnx --filter "FullyQualifiedName~CalculateRout
 
 Expected: FAIL. `NotEmpty()` on `string?` now rejects the text-only request, and there is no rule requiring or validating coordinates.
 
-- [ ] **Step 3: Rewrite the validator**
+- [x] **Step 3: Rewrite the validator**
 
 `backend/WeatherRoute.Api/Requests/CalculateRouteRequestValidator.cs` — the whole file:
 ```csharp
@@ -302,7 +335,7 @@ public sealed class CalculateRouteRequestValidator : AbstractValidator<Calculate
 
 > **Note on the `NotEmpty()` removal.** The original `RuleFor(x => x.Origin).NotEmpty()` is gone on purpose: a click on the map legitimately has no text, and the new "text or coordinates" rule subsumes it. The `MaximumLength(200)` stays, but only applies when there is no coordinate for that endpoint, because a coordinate's label can legitimately be absent.
 
-- [ ] **Step 4: Run the tests and watch them pass**
+- [x] **Step 4: Run the tests and watch them pass**
 
 ```bash
 dotnet test backend/WeatherRoute.slnx --filter "FullyQualifiedName~CalculateRouteRequestValidatorTests"
@@ -310,7 +343,7 @@ dotnet test backend/WeatherRoute.slnx --filter "FullyQualifiedName~CalculateRout
 
 Expected: PASS, 10 cases.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/WeatherRoute.Api/Requests/
@@ -331,7 +364,7 @@ git commit -m "feat: validate that each endpoint has text or coordinates"
 - Consumes: `CoordinatesDto`, `WeatherRoute.Domain.ValueObjects.Coordinates`.
 - Produces: `CalculateRouteCommand(string? Origin, string? Destination, Coordinates? OriginCoordinates, Coordinates? DestinationCoordinates, ActivityType Activity, DateTime DepartureTimeUtc, int? MaxDurationMinutes = null)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Read `tests/WeatherRoute.Application.Tests/` first and reuse the existing fake geocoding provider and fake route provider — do not write new ones. The assertion that matters is *absence of interaction*.
 
@@ -384,7 +417,7 @@ public sealed class CalculateRouteUseCaseCoordinatesTests
 
 > `ThrowingGeocodingProvider` throws on any call; `RecordingGeocodingProvider` records queries and returns `new Coordinates(40.4168, -3.7038)`. If the existing test project already has a single recording fake, add a `Queries` list to it instead of adding a second type. Copy the exact constructor wiring of `CalculateRouteUseCaseTests` — it constructs `CalculateRouteUseCase` with `(geocoding, routes, weather, sampler, risk)`.
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 dotnet test backend/WeatherRoute.slnx --filter "FullyQualifiedName~CalculateRouteUseCaseCoordinatesTests"
@@ -392,7 +425,7 @@ dotnet test backend/WeatherRoute.slnx --filter "FullyQualifiedName~CalculateRout
 
 Expected: FAIL to compile — `CalculateRouteCommand` has no `OriginCoordinates` parameter.
 
-- [ ] **Step 3: Extend the command**
+- [x] **Step 3: Extend the command**
 
 `backend/WeatherRoute.Application/Ports/In/ICalculateRouteUseCase.cs`:
 ```csharp
@@ -417,7 +450,7 @@ public sealed record CalculateRouteCommand(
     int? MaxDurationMinutes = null);
 ```
 
-- [ ] **Step 4: Make the use case conditional**
+- [x] **Step 4: Make the use case conditional**
 
 In `CalculateRouteUseCase.cs`, replace lines 40-41 with:
 ```csharp
@@ -437,7 +470,7 @@ private async Task<Coordinates> GeocodeAsync(string? place, CancellationToken ct
 
 Add `using WeatherRoute.Application.Ports.Out;` is already present — `GeocodingException` lives in that namespace, so no new using is needed. Verify with the compiler.
 
-- [ ] **Step 5: Map the request onto the command in the endpoint**
+- [x] **Step 5: Map the request onto the command in the endpoint**
 
 `RouteEndpoints.cs`, `/routes/analyze` — replace the `var command = ...` block:
 ```csharp
@@ -461,7 +494,7 @@ private static Coordinates? ToCoordinates(CoordinatesDto? dto) =>
 
 `/routes/analyses` also needs updating in this task, because it constructs the same command shape indirectly — see Step 6.
 
-- [ ] **Step 6: Extend `/routes/analyses` consistently**
+- [x] **Step 6: Extend `/routes/analyses` consistently**
 
 `RouteEndpoints.cs:74-75` currently geocodes unconditionally. Replace with:
 ```csharp
@@ -482,7 +515,7 @@ private static async Task<Coordinates> GeocodeRequiredAsync(
 
 `SaveAnalysisRequest` must also gain `CoordinatesDto? OriginCoordinates = null` and `CoordinatesDto? DestinationCoordinates = null`, otherwise the code above will not compile.
 
-- [ ] **Step 7: Run the whole fast suite**
+- [x] **Step 7: Run the whole fast suite**
 
 ```bash
 dotnet test backend/WeatherRoute.slnx --filter "Category!=Integration"
@@ -490,7 +523,7 @@ dotnet test backend/WeatherRoute.slnx --filter "Category!=Integration"
 
 Expected: PASS. Fix any other test that constructs `CalculateRouteCommand` positionally — they need the two new arguments.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add backend/WeatherRoute.Application backend/WeatherRoute.Api
@@ -509,7 +542,7 @@ git commit -m "feat: skip geocoding when analyze receives coordinates"
 - Consumes: `CalculateRouteCommand` with `Coordinates?`.
 - Produces: `public static string BuildKey(CalculateRouteCommand command)` — unchanged signature, new hashing. Coordinates round to 4 decimal places (`F4`, ≈11 m) so two clicks on the same street share an entry.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```csharp
 using WeatherRoute.Application.Ports.In;
@@ -588,7 +621,7 @@ public sealed class CachedCalculateRouteUseCaseKeyTests
 }
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 dotnet test backend/WeatherRoute.slnx --filter "FullyQualifiedName~CachedCalculateRouteUseCaseKeyTests"
@@ -596,7 +629,7 @@ dotnet test backend/WeatherRoute.slnx --filter "FullyQualifiedName~CachedCalcula
 
 Expected: `Same_coordinates_with_different_labels_share_a_key` FAILS, because the current key hashes the labels.
 
-- [ ] **Step 3: Rewrite `BuildKey`**
+- [x] **Step 3: Rewrite `BuildKey`**
 
 `CachedCalculateRouteUseCase.cs` — replace the `BuildKey` method and add the helper:
 ```csharp
@@ -620,7 +653,7 @@ private static string Part(Coordinates? coordinates, string? label) =>
 
 Add `using System.Globalization;` and `using WeatherRoute.Domain.ValueObjects;`. The `InvariantCulture` matters: under a comma-decimal locale `"F4"` would emit `40,4168` and collide with the separator.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 ```bash
 dotnet test backend/WeatherRoute.slnx --filter "FullyQualifiedName~CachedCalculateRouteUseCaseKeyTests"
@@ -628,7 +661,7 @@ dotnet test backend/WeatherRoute.slnx --filter "FullyQualifiedName~CachedCalcula
 
 Expected: PASS, 5 cases.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/WeatherRoute.Infrastructure/Caching
@@ -646,7 +679,7 @@ git commit -m "feat: hash coordinates into the route analysis cache key"
 - Consumes: the endpoint from Task 3.
 - Produces: proof that the whole path works with coordinates.
 
-- [ ] **Step 1: Find the existing analyze integration test**
+- [x] **Step 1: Find the existing analyze integration test**
 
 ```bash
 rg -l "routes/analyze" tests/WeatherRoute.Api.IntegrationTests
@@ -654,7 +687,7 @@ rg -l "routes/analyze" tests/WeatherRoute.Api.IntegrationTests
 
 Read it. Reuse its `WebApplicationFactory` setup and the stubbed `IRouteProvider` / `IWeatherProvider` registrations — do not build a new host.
 
-- [ ] **Step 2: Add the test**
+- [x] **Step 2: Add the test**
 
 ```csharp
 [Fact]
@@ -690,7 +723,7 @@ public async Task Analyze_rejects_an_origin_with_neither_text_nor_coordinates()
 }
 ```
 
-- [ ] **Step 3: Run it (needs Docker)**
+- [x] **Step 3: Run it (needs Docker)**
 
 ```bash
 dotnet test backend/WeatherRoute.slnx --filter "Category=Integration"
@@ -698,7 +731,7 @@ dotnet test backend/WeatherRoute.slnx --filter "Category=Integration"
 
 Expected: PASS. If Docker is unavailable, record that and re-run once Docker is up — do not mark this task done on a skip.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/WeatherRoute.Api.IntegrationTests
