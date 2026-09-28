@@ -52,6 +52,7 @@ const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas
     destinationPoint,
     isCompact = false,
     hoveredRouteId = null,
+    onHoverRoute,
     probePoint = null,
     pickMode = "none",
     onPickPoint,
@@ -65,6 +66,7 @@ const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const onSelectRouteRef = useRef(onSelectRoute);
   const onPickPointRef = useRef(onPickPoint);
+  const onHoverRouteRef = useRef(onHoverRoute);
   const pickModeRef = useRef(pickMode);
   const paintStateRef = useRef<PaintState>({
     routes,
@@ -88,6 +90,10 @@ const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas
   useEffect(() => {
     pickModeRef.current = pickMode;
   }, [pickMode]);
+
+  useEffect(() => {
+    onHoverRouteRef.current = onHoverRoute;
+  }, [onHoverRoute]);
 
   useEffect(() => {
     isCompactRef.current = isCompact;
@@ -208,12 +214,19 @@ const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas
 
     map.on("click", handleMapClick);
 
-    map.on("mousemove", "route-lines", () => {
+    const handleRouteMouseMove = (event: MapLayerMouseEvent) => {
+      const index = event.features?.[0]?.properties?.routeIndex;
+      if (typeof index !== "number") return;
       map.getCanvas().style.cursor = "pointer";
-    });
-    map.on("mouseleave", "route-lines", () => {
+      onHoverRouteRef.current?.(index);
+    };
+    const handleRouteMouseLeave = () => {
+      onHoverRouteRef.current?.(null);
       map.getCanvas().style.cursor = pickModeRef.current === "none" ? "" : "crosshair";
-    });
+    };
+
+    map.on("mousemove", "route-lines", handleRouteMouseMove);
+    map.on("mouseleave", "route-lines", handleRouteMouseLeave);
 
     map.on("click", "route-lines", (event: MapLayerMouseEvent) => {
       const routeIndex = event.features?.[0]?.properties?.routeIndex as number | undefined;
@@ -228,6 +241,8 @@ const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas
       for (const marker of markersRef.current) marker.remove();
       markersRef.current = [];
       map.off("click", handleMapClick);
+      map.off("mousemove", "route-lines", handleRouteMouseMove);
+      map.off("mouseleave", "route-lines", handleRouteMouseLeave);
       map.remove();
       mapRef.current = null;
       paintedRef.current = false;

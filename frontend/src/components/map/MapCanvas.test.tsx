@@ -365,7 +365,7 @@ describe("MapCanvas", () => {
     const map = StubMap.instances.at(-1)!;
     emitLoad(map);
 
-    act(() => map._emit("mousemove", "route-lines", { point: { x: 0, y: 0 } }));
+    act(() => map._emit("mousemove", "route-lines", { point: { x: 0, y: 0 }, features: [{ properties: { routeIndex: 0 } }] }));
     expect(map.getCanvas().style.cursor).toBe("pointer");
 
     act(() => map._emit("mouseleave", "route-lines", { point: { x: 0, y: 0 } }));
@@ -418,6 +418,67 @@ describe("MapCanvas", () => {
     act(() => ref.current?.ensureVisible({ latitude: 40.4168, longitude: -3.7038 }));
     expect(map.easeToCalls).toHaveLength(1);
     expect(map.easeToCalls[0]).toMatchObject({ center: [-3.7038, 40.4168] });
+  });
+
+  it("highlights the hovered route and reports it", () => {
+    const onHoverRoute = vi.fn();
+    render(
+      <MapCanvas
+        routes={makeRoutes(2)}
+        selectedRouteId={null}
+        onSelectRoute={vi.fn()}
+        onHoverRoute={onHoverRoute}
+      />,
+    );
+    const map = StubMap.instances.at(-1)!;
+    emitLoad(map);
+
+    act(() => map._emit("mousemove", "route-lines", { point: { x: 0, y: 0 }, features: [{ properties: { routeIndex: 1 } }] }));
+
+    expect(onHoverRoute).toHaveBeenCalledWith(1);
+    expect(map.getLayer("route-hover")?.filter).toEqual(["==", "$id", -1]);
+  });
+
+  it("clears the hover when the pointer leaves a route", () => {
+    const onHoverRoute = vi.fn();
+    render(<MapCanvas routes={makeRoutes(1)} selectedRouteId={null} onSelectRoute={vi.fn()} onHoverRoute={onHoverRoute} />);
+    const map = StubMap.instances.at(-1)!;
+    emitLoad(map);
+
+    act(() => map._emit("mouseleave", "route-lines", {}));
+
+    expect(onHoverRoute).toHaveBeenCalledWith(null);
+  });
+
+  it("moves the hover filter to the hovered index", () => {
+    const { rerender } = render(
+      <MapCanvas routes={makeRoutes(2)} selectedRouteId={null} onSelectRoute={vi.fn()} hoveredRouteId={1} />,
+    );
+    const map = StubMap.instances.at(-1)!;
+    emitLoad(map);
+
+    expect(map.getLayer("route-hover")?.filter).toEqual(["==", "$id", 1]);
+
+    rerender(<MapCanvas routes={makeRoutes(2)} selectedRouteId={null} onSelectRoute={vi.fn()} hoveredRouteId={null} />);
+
+    expect(map.getLayer("route-hover")?.filter).toEqual(["==", "$id", -1]);
+  });
+
+  it("renders a probe marker at the hovered profile point", () => {
+    render(
+      <MapCanvas
+        routes={makeRoutes(1)}
+        selectedRouteId={null}
+        onSelectRoute={vi.fn()}
+        probePoint={{ latitude: 40.5, longitude: -3.9 }}
+      />,
+    );
+    const map = StubMap.instances.at(-1)!;
+    emitLoad(map);
+
+    const probe = StubMarker.instances.at(-1)!;
+    expect(probe.element?.textContent).toBe("•");
+    expect(probe.lngLat).toEqual([-3.9, 40.5]);
   });
 
   it("cleans up the map on unmount", () => {

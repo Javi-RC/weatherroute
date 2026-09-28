@@ -105,6 +105,16 @@ underspecified in these places — the code is right, the plan was not:
   `fitBoundsCalls.length === 1` alone would pass if the handle framed the world
   default.
 
+### Deviations found while executing Task 14 (2026-09-28)
+
+- **The Task 12 cursor test now has to emit `features`.** `handleRouteMouseMove`
+  returns early when the pointer is not over a route, so the `mousemove` in
+  "shows a pointer cursor over a route" carries `features: [{ properties: {
+  routeIndex: 0 } }]`. Emitting it feature-less no longer describes the
+  behaviour, and the crosshair case keeps its own coverage.
+- **The probe test asserts the coordinates too**, not just the `•` label, so a
+  marker that renders at the wrong place still fails.
+
 ---
 
 ## File Structure
@@ -1864,7 +1874,7 @@ git commit -m "feat: make the map camera an explicit caller decision"
 - Consumes: `hoveredRouteId: number | null`, `onHoverRoute(index: number | null): void`, `probePoint: GeoPoint | null`.
 - Produces: a `route-hover` layer filter driven by the hovered index, and a probe marker at the hovered profile point.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it("highlights the hovered route and reports it", async () => {
@@ -1890,7 +1900,7 @@ it("renders a probe marker at the hovered profile point", async () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 npm test -- src/components/map/MapCanvas.test.tsx
@@ -1898,7 +1908,7 @@ npm test -- src/components/map/MapCanvas.test.tsx
 
 Expected: FAIL — no `onHoverRoute` prop.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add to the props:
 ```ts
@@ -1929,7 +1939,7 @@ Replace the simpler `mousemove`/`mouseleave` registrations added in Task 12 with
 
 The probe marker is already created by `paint()` in Task 11 (`label === "•"`), so this test passes as soon as `probePoint` reaches `PaintState`.
 
-- [ ] **Step 4: Run it**
+- [x] **Step 4: Run it**
 
 ```bash
 npm test -- src/components/map/MapCanvas.test.tsx && npm run typecheck
@@ -1937,7 +1947,7 @@ npm test -- src/components/map/MapCanvas.test.tsx && npm run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/map/MapCanvas.tsx frontend/src/components/map/MapCanvas.test.tsx
