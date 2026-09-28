@@ -9,6 +9,7 @@ import ActivityPicker, { ACTIVITY_OPTIONS } from "./ActivityPicker";
 import OriginDestinationFields, {
   DESTINATION_REQUIRED,
   ORIGIN_REQUIRED,
+  type ExternalEndpoint,
   type OriginDestinationFieldsHandle,
 } from "./OriginDestinationFields";
 import TimeOptions from "./TimeOptions";
@@ -27,6 +28,10 @@ export interface PlannerFormProps {
   onSearch: (search: PlannerSearch) => void;
   onLocationError?: () => void;
   busy?: boolean;
+  externalOrigin?: ExternalEndpoint | null;
+  externalDestination?: ExternalEndpoint | null;
+  onClearExternalOrigin?: () => void;
+  onClearExternalDestination?: () => void;
 }
 
 const ACTIVITY_REQUIRED = "Actividad requerida";
@@ -76,7 +81,15 @@ function collectValidationErrors(error: z.ZodError): ValidationErrors {
   return errors;
 }
 
-export default function PlannerForm({ onSearch, onLocationError, busy = false }: PlannerFormProps) {
+export default function PlannerForm({
+  onSearch,
+  onLocationError,
+  busy = false,
+  externalOrigin = null,
+  externalDestination = null,
+  onClearExternalOrigin,
+  onClearExternalDestination,
+}: PlannerFormProps) {
   const fieldsRef = useRef<OriginDestinationFieldsHandle>(null);
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
@@ -115,17 +128,33 @@ export default function PlannerForm({ onSearch, onLocationError, busy = false }:
     setErrors((prev) => ({ ...prev, maxDurationMinutes: undefined }));
   }
 
+  function handleClearOverride(field: "origin" | "destination") {
+    if (field === "origin") {
+      if (externalOrigin) setOrigin(externalOrigin.label);
+      onClearExternalOrigin?.();
+    } else {
+      if (externalDestination) setDestination(externalDestination.label);
+      onClearExternalDestination?.();
+    }
+    setErrors((prev) => ({ ...prev, [field]: undefined }));
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending || busy) return;
 
     setErrors({});
 
+    const useOverrideOrigin = externalOrigin !== null && origin === "";
+    const useOverrideDestination = externalDestination !== null && destination === "";
+    const effectiveOrigin = useOverrideOrigin ? externalOrigin!.label : origin;
+    const effectiveDestination = useOverrideDestination ? externalDestination!.label : destination;
+
     const parsed = plannerSchema.safeParse({
-      origin,
-      destination,
+      origin: effectiveOrigin,
+      destination: effectiveDestination,
       activity,
-      departure,
+      departure: departure,
       maxDurationMinutes: durationMax ?? undefined,
     });
 
@@ -144,13 +173,22 @@ export default function PlannerForm({ onSearch, onLocationError, busy = false }:
 
     setPending(true);
     try {
+      const overrideCandidate = (endpoint: ExternalEndpoint): PlaceCandidate => ({
+        label: endpoint.label,
+        lat: endpoint.point.latitude,
+        lon: endpoint.point.longitude,
+      });
       const [originResult, destinationResult] = await Promise.allSettled([
-        originResolved && originResolved.label === origin
-          ? Promise.resolve(originResolved)
-          : resolvePlace(origin),
-        destinationResolved && destinationResolved.label === destination
-          ? Promise.resolve(destinationResolved)
-          : resolvePlace(destination),
+        useOverrideOrigin
+          ? Promise.resolve(overrideCandidate(externalOrigin!))
+          : originResolved && originResolved.label === origin
+            ? Promise.resolve(originResolved)
+            : resolvePlace(origin),
+        useOverrideDestination
+          ? Promise.resolve(overrideCandidate(externalDestination!))
+          : destinationResolved && destinationResolved.label === destination
+            ? Promise.resolve(destinationResolved)
+            : resolvePlace(destination),
       ]);
       const resolvedOrigin = originResult.status === "fulfilled" ? originResult.value : null;
       const resolvedDestination =
@@ -189,6 +227,9 @@ export default function PlannerForm({ onSearch, onLocationError, busy = false }:
         onOriginResolved={setOriginResolved}
         onDestinationResolved={setDestinationResolved}
         onLocationError={onLocationError}
+        originOverride={externalOrigin}
+        destinationOverride={externalDestination}
+        onClearOverride={handleClearOverride}
       />
       {(errors.origin !== undefined || errors.destination !== undefined) && (
         <div className="flex flex-col gap-1">

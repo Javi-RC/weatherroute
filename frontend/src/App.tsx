@@ -1,10 +1,11 @@
-import { useMutation } from "@tanstack/react-query";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AboutModal, { type AboutSection } from "./components/about/AboutModal";
 import Header from "./components/Header";
 import HistorySheet from "./components/history/HistorySheet";
-import MapCanvas from "./components/map/MapCanvas";
-import MapLegend from "./components/map/MapLegend";
+import MapCanvas, { type MapCanvasHandle, type PickMode } from "./components/map/MapCanvas";
+import MapControlBar from "./components/map/MapControlBar";
+import PickModeBar from "./components/map/PickModeBar";
+import RouteDetailCard from "./components/map/RouteDetailCard";
 import PlannerSheet from "./components/planner/PlannerSheet";
 import type { PlannerSearch } from "./components/planner/PlannerForm";
 import RefreshingIndicator from "./components/results/RefreshingIndicator";
@@ -15,14 +16,14 @@ import { useIsDesktop } from "./lib/breakpoints";
 import { resolvePlace } from "./lib/places";
 import type { GeoPoint, LngLat, MapRouteInput } from "./lib/map";
 import { useRecentSearches } from "./hooks/useRecentSearches";
+import { useRouteAnalysis } from "./hooks/useRouteAnalysis";
+import { useUrlState } from "./hooks/useUrlState";
 import type { HistoryEntry } from "./lib/storage";
 import AppShell from "./layouts/AppShell";
 import { useDebouncedCallback } from "./hooks/useDebouncedCallback";
 import { ToastProvider, useToasts } from "./hooks/useToasts";
-import { analyzeRoute } from "./services/api";
-import type { AnalyzeRequest, RouteAnalysisResponse, RouteCandidate } from "./types";
-
-type AppStatus = "idle" | "loading" | "error" | "full" | "partial";
+import { reverseGeocode } from "./services/api";
+import type { RouteCandidate } from "./types";
 
 const ERROR_MESSAGE = "No se pudo calcular la ruta. Revisa tu conexión e inténtalo de nuevo.";
 const REFRESH_ERROR_MESSAGE = "No se pudo actualizar la ruta. Se conservan los resultados anteriores.";
@@ -63,9 +64,6 @@ export default function App() {
 
 function AppContent() {
   const { addToast } = useToasts();
-  const [status, setStatus] = useState<AppStatus>("idle");
-  const [result, setResult] = useState<RouteAnalysisResponse | null>(null);
-  const [last, setLast] = useState<AnalyzeRequest | null>(null);
   const history = useRecentSearches();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -75,65 +73,28 @@ function AppContent() {
   const [destinationLabel, setDestinationLabel] = useState("");
   const [originPoint, setOriginPoint] = useState<GeoPoint | null>(null);
   const [destinationPoint, setDestinationPoint] = useState<GeoPoint | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const refreshRequestRef = useRef<AnalyzeRequest | null>(null);
-  const intentRef = useRef<{ request: AnalyzeRequest; isRefresh: boolean } | null>(null);
 
+  const { state: url, update: updateUrl } = useUrlState();
   const isCompact = !useIsDesktop();
+  const mapRef = useRef<MapCanvasHandle | null>(null);
+  const [pickMode, setPickMode] = useState<PickMode>(originPoint ? "destination" : "origin");
+  const [hoveredRouteId, setHoveredRouteId] = useState<number | null>(null);
+  const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
+  const [runId, setRunId] = useState(0);
+  const restoredRef = useRef(false);
 
-  const mutation = useMutation({
-    mutationFn: analyzeRoute,
-    onSuccess: (data, variables) => {
-      const intent = intentRef.current;
-      if (!intent || intent.request !== variables) return;
-      if (intent.request.origin && intent.request.destination) {
-        history.save({
-          origin: intent.request.origin,
-          destination: intent.request.destination,
-          activity: intent.request.activity,
-          departureTimeUtc: intent.request.departureTime,
-          maxDurationMinutes: intent.request.maxDurationMinutes ?? null,
-        });
-      }
-      setResult(data);
-      setStatus(data.status);
-      if (data.status === "partial") {
-        if (!data.weatherAvailable) {
-          addToast("info", WEATHER_UNAVAILABLE_TOAST);
-        } else if (!data.routeAvailable) {
-          addToast("info", ROUTE_UNAVAILABLE_TOAST);
-        }
-      }
-      if (!intent.isRefresh) {
-        setSelectedRouteId(data.routes.length > 0 ? findBestRouteIndex(data.routes) : null);
-      }
-      setRefreshing(false);
+  const analysis = useRouteAnalysis({
+    saveToHistory: history.save,
+    notifyRefreshError: () => addToast("error", REFRESH_ERROR_MESSAGE),
+    notifyPartial: (data) => {
+      if (!data.weatherAvailable) addToast("info", WEATHER_UNAVAILABLE_TOAST);
+      else if (!data.routeAvailable) addToast("info", ROUTE_UNAVAILABLE_TOAST);
     },
-    onError: (_error, variables) => {
-      const intent = intentRef.current;
-      if (!intent || intent.request !== variables) return;
-      if (intent.isRefresh) {
-        setRefreshing(false);
-        addToast("error", REFRESH_ERROR_MESSAGE);
-        return;
-      }
-      setStatus("error");
+    selectBestRoute: (data) => {
+      setSelectedRouteId(data.routes.length > 0 ? findBestRouteIndex(data.routes) : null);
     },
   });
-
-  const scheduleRefresh = useDebouncedCallback(() => {
-    const request = refreshRequestRef.current;
-    refreshRequestRef.current = null;
-    if (request === null || refreshing || status === "loading" || mutation.isPending) return;
-    intentRef.current = { request, isRefresh: true };
-    setRefreshing(true);
-    try {
-      mutation.mutate(request);
-    } catch {
-      setRefreshing(false);
-      addToast("error", REFRESH_ERROR_MESSAGE);
-    }
-  });
+  const { result, status, refreshing } = analysis;
 
   const mapRoutes = useMemo<MapRouteInput[]>(() => {
     if (!result) return [];
@@ -143,68 +104,108 @@ function AppContent() {
   }, [result, originLabel, destinationLabel, selectedRouteId]);
 
   function handleSearch(search: PlannerSearch) {
-    const request: AnalyzeRequest = {
-      origin: search.origin,
-      destination: search.destination,
-      activity: search.activity,
-      departureTime: search.departureTime,
-      maxDurationMinutes: search.maxDurationMinutes,
-    };
-
-    const samePlaces =
-      (status === "full" || status === "partial") &&
-      search.origin === originLabel &&
-      search.destination === destinationLabel &&
-      originPoint !== null &&
-      destinationPoint !== null &&
-      search.originPoint.latitude === originPoint.latitude &&
-      search.originPoint.longitude === originPoint.longitude &&
-      search.destinationPoint.latitude === destinationPoint.latitude &&
-      search.destinationPoint.longitude === destinationPoint.longitude;
-
-    if (samePlaces) {
-      const unchanged =
-        last !== null &&
-        request.activity === last.activity &&
-        request.departureTime === last.departureTime &&
-        request.maxDurationMinutes === last.maxDurationMinutes;
-      if (!unchanged) {
-        refreshRequestRef.current = request;
-        setLast(request);
-        scheduleRefresh();
-      }
-      return;
-    }
-
-    intentRef.current = { request, isRefresh: false };
-    refreshRequestRef.current = null;
-    setRefreshing(false);
-    setLast(request);
+    const fired = analysis.runAnalysis(search, {
+      originLabel,
+      destinationLabel,
+      originPoint,
+      destinationPoint,
+    });
+    if (!fired) return;
     setOriginLabel(search.origin);
     setDestinationLabel(search.destination);
     setOriginPoint(search.originPoint);
     setDestinationPoint(search.destinationPoint);
     setSelectedRouteId(null);
-    setStatus("loading");
-    try {
-      mutation.mutate(request);
-    } catch {
-      setStatus("error");
-    }
+    setRunId((current) => current + 1);
   }
 
-  function handleRetry() {
-    if (!last) return;
-    intentRef.current = { request: last, isRefresh: false };
-    refreshRequestRef.current = null;
-    setRefreshing(false);
-    setSelectedRouteId(null);
-    setStatus("loading");
+  useEffect(() => {
+    if (runId === 0) return;
+    mapRef.current?.fitToRoutes();
+  }, [runId, result]);
+
+  function handleSelectRoute(index: number) {
+    setSelectedRouteId(index);
+    updateUrl({ selectedRouteIndex: index });
+  }
+
+  const selectedRoute = result?.routes.find((_route, index) => index === selectedRouteId) ?? null;
+  const probePoint = useMemo(() => {
+    const segment = selectedRoute?.segments[hoveredSegment ?? -1];
+    if (!segment || !selectedRoute) return null;
+    const vertex = selectedRoute.polyline[segment.fromIndex];
+    return vertex ? { latitude: vertex.latitude, longitude: vertex.longitude } : null;
+  }, [selectedRoute, hoveredSegment]);
+
+  const syncCamera = useDebouncedCallback(
+    (center: { lng: number; lat: number }, zoom: number) => {
+      updateUrl({
+        zoom,
+        center: Array.isArray(center)
+          ? { latitude: center[1], longitude: center[0] }
+          : { latitude: center.lat, longitude: center.lng },
+      });
+    },
+    500,
+  );
+
+  async function handlePickPoint(point: GeoPoint) {
+    const fallback = `Punto ${point.latitude.toLocaleString("es-ES", { maximumFractionDigits: 4 })}, ${point.longitude.toLocaleString("es-ES", { maximumFractionDigits: 4 })}`;
+    let label: string;
     try {
-      mutation.mutate(last);
+      label = (await reverseGeocode(point.latitude, point.longitude)) ?? fallback;
     } catch {
-      setStatus("error");
+      label = fallback;
     }
+
+    if (pickMode === "origin") {
+      setOriginPoint(point);
+      setOriginLabel(label);
+      updateUrl({ origin: point, originLabel: label });
+      setPickMode("destination");
+    } else if (pickMode === "destination") {
+      setDestinationPoint(point);
+      setDestinationLabel(label);
+      updateUrl({ destination: point, destinationLabel: label });
+      setPickMode("none");
+    }
+    mapRef.current?.ensureVisible(point);
+  }
+
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    if (url.origin) {
+      setOriginPoint(url.origin);
+      setOriginLabel(url.originLabel);
+    }
+    if (url.destination) {
+      setDestinationPoint(url.destination);
+      setDestinationLabel(url.destinationLabel);
+    }
+    if (url.origin && url.destination) {
+      handleSearch({
+        origin: url.originLabel,
+        destination: url.destinationLabel,
+        originPoint: url.origin,
+        destinationPoint: url.destination,
+        activity: url.activity,
+        departureTime: url.departureTime || new Date().toISOString(),
+        maxDurationMinutes: url.maxDurationMinutes,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || url.zoom === null || url.center === null) return;
+    map.jumpTo([url.center.longitude, url.center.latitude], url.zoom);
+  }, [url.zoom, url.center]);
+
+  function handleRetry() {
+    analysis.retry();
+    setSelectedRouteId(null);
   }
 
   async function handleRunHistory(entry: HistoryEntry) {
@@ -231,17 +232,21 @@ function AppContent() {
   }
 
   function handleNewSearch() {
-    intentRef.current = null;
-    refreshRequestRef.current = null;
-    setRefreshing(false);
-    setResult(null);
-    setLast(null);
+    analysis.reset();
     setOriginLabel("");
     setDestinationLabel("");
     setOriginPoint(null);
     setDestinationPoint(null);
     setSelectedRouteId(null);
-    setStatus("idle");
+    updateUrl({
+      origin: null,
+      originLabel: "",
+      destination: null,
+      destinationLabel: "",
+      selectedRouteIndex: null,
+      zoom: null,
+      center: null,
+    });
   }
 
   function handleLocationError() {
@@ -266,6 +271,23 @@ function AppContent() {
               busy={status === "loading"}
               onSearch={handleSearch}
               onLocationError={handleLocationError}
+              pickMode={pickMode}
+              externalOrigin={originPoint ? { label: originLabel, point: originPoint } : null}
+              externalDestination={
+                destinationPoint ? { label: destinationLabel, point: destinationPoint } : null
+              }
+              onClearExternalOrigin={() => {
+                setOriginPoint(null);
+                setOriginLabel("");
+                updateUrl({ origin: null, originLabel: "" });
+                setPickMode("origin");
+              }}
+              onClearExternalDestination={() => {
+                setDestinationPoint(null);
+                setDestinationLabel("");
+                updateUrl({ destination: null, destinationLabel: "" });
+                setPickMode("destination");
+              }}
             />
             <RefreshingIndicator visible={refreshing} />
             <ResultsLayer
@@ -274,7 +296,7 @@ function AppContent() {
               weatherAvailable={result?.weatherAvailable ?? true}
               routeAvailable={result?.routeAvailable ?? true}
               selectedRouteId={selectedRouteId}
-              onSelectRoute={setSelectedRouteId}
+              onSelectRoute={handleSelectRoute}
               onRetry={handleRetry}
               onNewSearch={handleNewSearch}
               error={status === "error" ? ERROR_MESSAGE : null}
@@ -289,16 +311,39 @@ function AppContent() {
             />
           ) : undefined
         }
-        legendSlot={<MapLegend />}
       >
         <MapCanvas
+          ref={mapRef}
           routes={mapRoutes}
           selectedRouteId={selectedRouteId}
-          onSelectRoute={setSelectedRouteId}
+          onSelectRoute={handleSelectRoute}
           originPoint={originPoint ?? undefined}
           destinationPoint={destinationPoint ?? undefined}
           isCompact={isCompact}
+          pickMode={pickMode}
+          onPickPoint={handlePickPoint}
+          hoveredRouteId={hoveredRouteId}
+          onHoverRoute={setHoveredRouteId}
+          probePoint={probePoint}
+          onCameraChange={syncCamera}
         />
+        <div className="absolute left-4 top-4 z-20">
+          <PickModeBar
+            pickMode={pickMode}
+            onChange={setPickMode}
+            onFitView={() => mapRef.current?.fitToRoutes()}
+          />
+        </div>
+        <div className="absolute left-4 top-20 z-20">
+          <RouteDetailCard
+            route={selectedRoute}
+            weatherAvailable={result?.weatherAvailable ?? true}
+            onHoverSegment={setHoveredSegment}
+            onClose={() => setSelectedRouteId(null)}
+            onHowCalculated={() => openAbout("score")}
+          />
+        </div>
+        <MapControlBar compact={isCompact} />
       </AppShell>
       <HistorySheet
         open={historyOpen}

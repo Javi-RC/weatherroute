@@ -16,7 +16,7 @@ function geoFetch() {
 
 describe("PlannerSheet", () => {
   it("renders the planner as a desktop panel with the form visible", () => {
-    render(<PlannerSheet busy={false} onSearch={vi.fn()} isCompact={false} />);
+    render(<PlannerSheet busy={false} onSearch={vi.fn()} pickMode="none" externalOrigin={null} externalDestination={null} />);
 
     expect(screen.getByTestId("planner-sheet")).toBeInTheDocument();
     expect(screen.getByLabelText(/Desde/i)).toBeInTheDocument();
@@ -26,7 +26,16 @@ describe("PlannerSheet", () => {
 
   it("shows a floating pill on mobile and expands it into a bottom sheet", async () => {
     const user = userEvent.setup();
-    render(<PlannerSheet busy={false} onSearch={vi.fn()} isCompact />);
+    render(
+      <PlannerSheet
+        busy={false}
+        onSearch={vi.fn()}
+        isCompact
+        pickMode="none"
+        externalOrigin={null}
+        externalDestination={null}
+      />,
+    );
 
     expect(screen.getByTestId("planner-fab")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Planificar ruta" })).toBeInTheDocument();
@@ -42,7 +51,16 @@ describe("PlannerSheet", () => {
     geoFetch();
     const user = userEvent.setup();
     const onSearch = vi.fn();
-    render(<PlannerSheet busy={false} onSearch={onSearch} isCompact />);
+    render(
+      <PlannerSheet
+        busy={false}
+        onSearch={onSearch}
+        isCompact
+        pickMode="none"
+        externalOrigin={null}
+        externalDestination={null}
+      />,
+    );
 
     await user.click(screen.getByRole("button", { name: "Planificar ruta" }));
     await user.type(screen.getByLabelText(/Desde/i), "Ciudad Real");
@@ -59,7 +77,16 @@ describe("PlannerSheet", () => {
   });
 
   it("keeps the floating pill but disabled while the search is busy", () => {
-    render(<PlannerSheet busy onSearch={vi.fn()} isCompact />);
+    render(
+      <PlannerSheet
+        busy
+        onSearch={vi.fn()}
+        isCompact
+        pickMode="none"
+        externalOrigin={null}
+        externalDestination={null}
+      />,
+    );
 
     const pill = screen.getByRole("button", { name: "Calculando…" });
     expect(pill).toBeDisabled();

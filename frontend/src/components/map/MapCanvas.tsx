@@ -17,6 +17,7 @@ export type PickMode = "origin" | "destination" | "none";
 export interface MapCanvasHandle {
   fitToRoutes(): void;
   ensureVisible(point: GeoPoint): void;
+  jumpTo(center: [number, number], zoom: number): void;
 }
 
 export interface MapCanvasProps {
@@ -31,6 +32,7 @@ export interface MapCanvasProps {
   probePoint?: GeoPoint | null;
   pickMode?: PickMode;
   onPickPoint?: (point: GeoPoint) => void;
+  onCameraChange?: (center: { lng: number; lat: number }, zoom: number) => void;
 }
 
 interface PaintState {
@@ -56,6 +58,7 @@ const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas
     probePoint = null,
     pickMode = "none",
     onPickPoint,
+    onCameraChange,
   },
   ref,
 ) {
@@ -67,6 +70,7 @@ const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas
   const onSelectRouteRef = useRef(onSelectRoute);
   const onPickPointRef = useRef(onPickPoint);
   const onHoverRouteRef = useRef(onHoverRoute);
+  const onCameraChangeRef = useRef(onCameraChange);
   const pickModeRef = useRef(pickMode);
   const paintStateRef = useRef<PaintState>({
     routes,
@@ -94,6 +98,10 @@ const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas
   useEffect(() => {
     onHoverRouteRef.current = onHoverRoute;
   }, [onHoverRoute]);
+
+  useEffect(() => {
+    onCameraChangeRef.current = onCameraChange;
+  }, [onCameraChange]);
 
   useEffect(() => {
     isCompactRef.current = isCompact;
@@ -225,8 +233,13 @@ const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas
       map.getCanvas().style.cursor = pickModeRef.current === "none" ? "" : "crosshair";
     };
 
+    const handleMoveEnd = () => {
+      onCameraChangeRef.current?.(map.getCenter(), map.getZoom());
+    };
+
     map.on("mousemove", "route-lines", handleRouteMouseMove);
     map.on("mouseleave", "route-lines", handleRouteMouseLeave);
+    map.on("moveend", handleMoveEnd);
 
     map.on("click", "route-lines", (event: MapLayerMouseEvent) => {
       const routeIndex = event.features?.[0]?.properties?.routeIndex as number | undefined;
@@ -243,6 +256,7 @@ const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas
       map.off("click", handleMapClick);
       map.off("mousemove", "route-lines", handleRouteMouseMove);
       map.off("mouseleave", "route-lines", handleRouteMouseLeave);
+      map.off("moveend", handleMoveEnd);
       map.remove();
       mapRef.current = null;
       paintedRef.current = false;
@@ -292,6 +306,11 @@ const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas
           point.latitude <= bounds.getNorth();
         if (inside) return;
         map.easeTo({ center: [point.longitude, point.latitude], duration: 400 });
+      },
+      jumpTo(center, zoom) {
+        const map = mapRef.current;
+        if (!map) return;
+        map.jumpTo({ center, zoom });
       },
     }),
     [],

@@ -2930,7 +2930,7 @@ git commit -m "feat: switch the app shell to a sidebar and map layout"
 - Consumes: `useUrlState`, `useIsDesktop`, `MapCanvasHandle`, `PickMode`, all new components.
 - Produces: the composed app. This is where the click-to-pick flow lives end to end.
 
-- [ ] **Step 1: Write the failing integration test**
+- [x] **Step 1: Write the failing integration test**
 
 Add to `frontend/src/App.test.tsx`, reusing that file's existing `fetch` and `matchMedia` mocks:
 
@@ -2994,7 +2994,7 @@ npm test -- src/App.test.tsx
 
 Expected: FAIL — no `PickModeBar`, the map has no pick handler wired from `App`, and nothing fits the view.
 
-- [ ] **Step 3: Add the state and handlers**
+- [x] **Step 3: Add the state and handlers**
 
 In `AppContent`, after the existing state declarations:
 
@@ -3065,7 +3065,7 @@ Add the camera effect:
   }, [runId, result]);
 ```
 
-- [ ] **Step 4: Compose the JSX**
+- [x] **Step 4: Compose the JSX**
 
 ```tsx
       <AppShell
@@ -3145,7 +3145,7 @@ Add the derived values:
   }
 ```
 
-- [ ] **Step 6: Restore the state from a shared link and run it automatically**
+- [x] **Step 6: Restore the state from a shared link and run it automatically**
 
 `useUrlState` already parses on mount. Seed React state from it once, then fire the analysis when both endpoints are present:
 
@@ -3182,7 +3182,7 @@ Add the derived values:
 
 The `restoredRef` guard matters: `useUrlState` returns a fresh object identity on every `popstate`, and re-running this effect would re-fire the analysis on every back button press.
 
-- [ ] **Step 7: Write the camera into the URL**
+- [x] **Step 7: Write the camera into the URL**
 
 A shared link should reopen at the same view. Extend `useUrlState`'s `UrlState` with `zoom: number | null` and `center: GeoCoordinates | null` (params `z`, `lat`, `lon`), then in `App` write the camera on `moveend`, debounced with the existing `useDebouncedCallback`:
 
@@ -3221,7 +3221,7 @@ it("does not refit when only the camera changes", async () => {
 });
 ```
 
-- [ ] **Step 8: Extract the analysis state machine into `useRouteAnalysis`**
+- [x] **Step 8: Extract the analysis state machine into `useRouteAnalysis`**
 
 `App.tsx` is currently 327 lines and will have grown. Move the mutation, the debounced refresh, `intentRef`, `refreshRequestRef` and the history save into `src/hooks/useRouteAnalysis.ts`:
 
@@ -3240,7 +3240,7 @@ export function useRouteAnalysis(): RouteAnalysisController;
 
 `App.tsx` keeps only UI state (pick mode, hover, announcement, camera) and calls the controller. Extract verbatim — no behaviour change in this step — then re-run the suite to prove the move was inert.
 
-- [ ] **Step 9: Run it**
+- [x] **Step 9: Run it**
 
 ```bash
 npm test -- src/App.test.tsx && npm run typecheck
@@ -3276,7 +3276,17 @@ Add a small `PickHint` strip above the form so the sidebar explains the map inte
 
 `OriginDestinationFields` gains `originOverride` / `destinationOverride`; when set, it renders the label and a small "cambiar" button instead of the free-text input, and reports the point through the existing `validate()` handle. Read `OriginDestinationFields.tsx:76-81` first — it already exposes an imperative `validate()` via `useImperativeHandle`, and the override path must keep satisfying it.
 
-- [ ] **Step 11: Commit**
+**Deviations from plan (Task 20):**
+- `RouteDetailCard` renders at `left-4 top-20` instead of the plan's `bottom-4 left-4`, so it never overlaps `MapControlBar` on desktop (itself at `left-4 bottom-4`; both z-20).
+- `PlannerSheetProps` has `pickMode`/`externalOrigin`/`externalDestination`/`onClearExternalOrigin`/`onClearExternalDestination` but **not** `onPickModeChange` (unused → `noUnusedLocals`); the clear buttons own the pick-mode transitions in `App`.
+- Picked-point override is conditional: it renders and is used **only while the free-text input is empty**. Once the user types, the typed text wins and the marker is cleared only via "cambiar"/"Nueva búsqueda". This keeps the inputs usable after a typed search (map markers set by `handleSearch`).
+- URL restore does **not** seed the planner form (`activity`/`departureTime`/`maxDurationMinutes` are owned by `PlannerForm`); restore only seeds points/labels and fires the analysis with the URL values.
+- `useUrlState` gained `zoom`/`center`; camera restore uses `mapRef.current.jumpTo([lng, lat], zoom)`; `MapCanvas` exposes `onCameraChange(center: { lng; lat }, zoom)` and a `jumpTo` handle. `syncCamera` normalizes the stub tuple (`[lng, lat]`) vs the real `LngLat` with `Array.isArray`.
+- `useRouteAnalysis` (Step 8) keeps the `samePlaces` guard and `lastRef`, but `runAnalysis(search, places)` takes the current labels/points for the guard/coordinates and returns whether a request actually fired, so `App` applies the new places + bumps `runId` only on a full run. Side-effects (history save, toasts, best-route selection, refresh error) flow through a `RouteAnalysisEffects` arg instead of the plant's zero-arg signature.
+- Step 1 tests changed: sync `act` clicks don't flush the async pick continuation, so the two map clicks are awaited each (`await act(async () => …)`), and `beforeEach` resets `window.history` to `/` — picking/re-running now write the URL, which otherwise leaked into later tests via `replaceState`.
+- Task 19 already dropped `expandedRouteId`/`LiveRegion` (extracted to `RouteDetailCard`); Task 20 does not pass them.
+
+- [x] **Step 11: Commit**
 
 ```bash
 git add frontend/src/App.tsx frontend/src/components/planner/

@@ -10,6 +10,8 @@ export interface UrlState {
   departureTime: string;
   maxDurationMinutes: number | null;
   selectedRouteIndex: number | null;
+  zoom: number | null;
+  center: GeoCoordinates | null;
 }
 
 export const DEFAULT_ACTIVITY: ActivityType = "Cycling";
@@ -31,7 +33,16 @@ export const DEFAULT_STATE: UrlState = {
   departureTime: "",
   maxDurationMinutes: null,
   selectedRouteIndex: null,
+  zoom: null,
+  center: null,
 };
+
+function parseZoom(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return parsed;
+}
 
 export function parseCoordinates(value: string | null): GeoCoordinates | null {
   if (!value) return null;
@@ -69,6 +80,8 @@ function readState(): UrlState {
     maxDurationMinutes:
       parsedMax !== null && Number.isInteger(parsedMax) && parsedMax > 0 ? parsedMax : null,
     selectedRouteIndex: parseIndex(query.get("r")),
+    zoom: parseZoom(query.get("z")),
+    center: parseCoordinates(`${query.get("lat")},${query.get("lon")}`),
   };
 }
 
@@ -82,6 +95,11 @@ function writeState(state: UrlState): void {
   if (state.departureTime) query.set("t", state.departureTime);
   if (state.maxDurationMinutes !== null) query.set("max", String(state.maxDurationMinutes));
   if (state.selectedRouteIndex !== null) query.set("r", String(state.selectedRouteIndex));
+  if (state.zoom !== null) query.set("z", String(state.zoom));
+  if (state.center) {
+    query.set("lat", String(state.center.latitude));
+    query.set("lon", String(state.center.longitude));
+  }
   const search = query.toString();
   window.history.replaceState(null, "", search ? `/?${search}` : "/");
 }

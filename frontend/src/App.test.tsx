@@ -142,6 +142,7 @@ beforeEach(() => {
   StubMarker.reset();
   stubDesktopMedia();
   window.localStorage.clear();
+  window.history.replaceState(null, "", "/");
 });
 
 afterEach(() => {
@@ -190,7 +191,7 @@ describe("App", () => {
     expect(screen.getByText("Ruta 1")).toBeInTheDocument();
     expect(screen.getByText("Ruta 2")).toBeInTheDocument();
     expect(screen.getAllByText("Distancia").length).toBeGreaterThan(0);
-    expect(screen.getByRole("meter", { name: "Índice de condiciones" })).toBeInTheDocument();
+    expect(screen.getAllByRole("meter", { name: "Índice de condiciones" }).length).toBeGreaterThan(0);
     expect(screen.queryByText(WELCOME_TITLE)).not.toBeInTheDocument();
     expect(calls.analyze).toBe(1);
 
@@ -544,5 +545,84 @@ describe("App", () => {
 
     expect(screen.getByText("Aún no hay búsquedas guardadas")).toBeInTheDocument();
     expect(window.localStorage.getItem("weatherroute:history")).toBe("[]");
+  });
+
+  it("sends coordinates after the user picks both points on the map", async () => {
+    mockFetch(() => analysisResponse());
+    renderApp();
+    await screen.findByRole("button", { name: "Buscar ruta" });
+
+    const originClick = { lngLat: { lng: -3.7038, lat: 40.4168 }, point: { x: 0, y: 0 } };
+    const destinationClick = { lngLat: { lng: -4.0273, lat: 39.8628 }, point: { x: 0, y: 0 } };
+    const map = StubMap.instances[0];
+    map.renderedFeatures = [];
+    await screen.findByRole("button", { name: "Origen" });
+    await act(async () => {
+      map._emit("click", originClick);
+    });
+    await act(async () => {
+      map._emit("click", destinationClick);
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Buscar ruta" }));
+
+    await waitFor(() => expect(fetch as unknown as ReturnType<typeof vi.fn>).toHaveBeenCalled());
+    const calls = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls;
+    const analyzeCall = calls.find((call) => String(call[0]).includes("/api/routes/analyze"));
+    const body = JSON.parse((analyzeCall![1] as RequestInit).body as string);
+    expect(body.originCoordinates).toEqual({ latitude: 40.4168, longitude: -3.7038 });
+    expect(body.destinationCoordinates).toEqual({ latitude: 39.8628, longitude: -4.0273 });
+  });
+
+  it("keeps the picked point even when reverse geocoding fails", async () => {
+    const geocode = vi
+      .fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/api/routes/analyze")) return analysisResponse();
+        throw new Error("offline");
+      });
+    vi.stubGlobal("fetch", geocode as unknown as typeof fetch);
+    renderApp();
+    await screen.findByRole("button", { name: "Buscar ruta" });
+    const map = StubMap.instances[0];
+    map.renderedFeatures = [];
+    await userEvent.click(screen.getByRole("button", { name: "Origen" }));
+    act(() => map._emit("click", { lngLat: { lng: -3.7038, lat: 40.4168 }, point: { x: 0, y: 0 } }));
+
+    await waitFor(() => expect(screen.getByText(/^Punto /i)).toBeInTheDocument());
+  });
+
+  it("frames the routes once a new analysis lands", async () => {
+    mockFetch(() => analysisResponse());
+    renderApp();
+    await screen.findByRole("button", { name: "Buscar ruta" });
+    await userEvent.type(screen.getByLabelText(/desde/i), "Madrid");
+    await userEvent.type(screen.getByLabelText(/hasta/i), "Toledo");
+    await userEvent.click(screen.getByRole("button", { name: "Buscar ruta" }));
+
+    await waitFor(() => expect(StubMap.instances[0].fitBoundsCalls.length).toBeGreaterThan(0));
+  });
+
+  it("re-runs the analysis when the link already carries both points", async () => {
+    const calls = mockFetch(() => analysisResponse());
+    window.history.replaceState(null, "", "/?o=40.4168,-3.7038&ol=Madrid&d=39.8628,-4.0273&dl=Toledo&a=Cycling");
+    renderApp();
+    await waitFor(() => expect(calls.analyze).toBe(1));
+  });
+
+  it("does not refit when only the camera changes", async () => {
+    mockFetch(() => analysisResponse());
+    renderApp();
+    await screen.findByRole("button", { name: "Buscar ruta" });
+    await userEvent.type(screen.getByLabelText(/desde/i), "Madrid");
+    await userEvent.type(screen.getByLabelText(/hasta/i), "Toledo");
+    await userEvent.click(screen.getByRole("button", { name: "Buscar ruta" }));
+
+    await waitFor(() => expect(StubMap.instances[0].fitBoundsCalls.length).toBeGreaterThan(0));
+    const fits = StubMap.instances[0].fitBoundsCalls.length;
+
+    act(() => StubMap.instances[0]._emit("moveend"));
+
+    expect(StubMap.instances[0].fitBoundsCalls.length).toBe(fits);
   });
 });
