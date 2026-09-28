@@ -14,6 +14,14 @@ export interface ActivityOption {
   icon: ComponentType<{ className?: string }>;
 }
 
+export const ACTIVITY_LABELS: Record<ActivityType, string> = {
+  Walking: "caminata",
+  Running: "carrera",
+  Cycling: "ciclismo",
+  Motorcycle: "motocicleta",
+  Driving: "conducción",
+};
+
 export const ACTIVITY_OPTIONS: readonly ActivityOption[] = [
   { value: "Walking", label: "Caminar", icon: FaWalking },
   { value: "Running", label: "Correr", icon: FaRunning },

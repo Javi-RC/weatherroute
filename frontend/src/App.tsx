@@ -7,6 +7,7 @@ import MapControlBar from "./components/map/MapControlBar";
 import PickModeBar from "./components/map/PickModeBar";
 import RouteDetailCard from "./components/map/RouteDetailCard";
 import PlannerSheet from "./components/planner/PlannerSheet";
+import { ACTIVITY_LABELS } from "./components/planner/ActivityPicker";
 import type { PlannerSearch } from "./components/planner/PlannerForm";
 import RefreshingIndicator from "./components/results/RefreshingIndicator";
 import ResultsLayer from "./components/results/ResultsLayer";
@@ -23,7 +24,7 @@ import AppShell from "./layouts/AppShell";
 import { useDebouncedCallback } from "./hooks/useDebouncedCallback";
 import { ToastProvider, useToasts } from "./hooks/useToasts";
 import { reverseGeocode } from "./services/api";
-import type { RouteCandidate } from "./types";
+import type { RouteCandidate, ActivityType } from "./types";
 
 const ERROR_MESSAGE = "No se pudo calcular la ruta. Revisa tu conexión e inténtalo de nuevo.";
 const REFRESH_ERROR_MESSAGE = "No se pudo actualizar la ruta. Se conservan los resultados anteriores.";
@@ -73,6 +74,7 @@ function AppContent() {
   const [destinationLabel, setDestinationLabel] = useState("");
   const [originPoint, setOriginPoint] = useState<GeoPoint | null>(null);
   const [destinationPoint, setDestinationPoint] = useState<GeoPoint | null>(null);
+  const [activity, setActivity] = useState<ActivityType>("Driving");
 
   const { state: url, update: updateUrl } = useUrlState();
   const isCompact = !useIsDesktop();
@@ -115,6 +117,7 @@ function AppContent() {
     setDestinationLabel(search.destination);
     setOriginPoint(search.originPoint);
     setDestinationPoint(search.destinationPoint);
+    setActivity(search.activity);
     setSelectedRouteId(null);
     setRunId((current) => current + 1);
   }
@@ -296,6 +299,7 @@ function AppContent() {
               weatherAvailable={result?.weatherAvailable ?? true}
               routeAvailable={result?.routeAvailable ?? true}
               selectedRouteId={selectedRouteId}
+              activityLabel={ACTIVITY_LABELS[activity]}
               onSelectRoute={handleSelectRoute}
               onRetry={handleRetry}
               onNewSearch={handleNewSearch}

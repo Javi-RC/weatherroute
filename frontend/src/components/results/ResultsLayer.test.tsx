@@ -43,6 +43,7 @@ function props(overrides: Partial<ResultsLayerProps> = {}): ResultsLayerProps {
     weatherAvailable: true,
     routeAvailable: true,
     selectedRouteId: null,
+    activityLabel: "caminata",
     onSelectRoute: vi.fn(),
     onRetry: vi.fn(),
     onNewSearch: vi.fn(),
@@ -87,16 +88,35 @@ describe("ResultsLayer", () => {
     expect(screen.queryByText("Lluvia máx.")).not.toBeInTheDocument();
   });
 
-  it("renders the route-service-unavailable banner", () => {
+  it("renders a no-route explanation instead of an empty list", () => {
     render(
       <ResultsLayer
         {...props({ viewState: "partial", routeAvailable: false, routes: [] })}
       />,
     );
 
-    expect(screen.getByText(ROUTE_UNAVAILABLE_MESSAGE)).toBeInTheDocument();
     expect(screen.queryByText(WEATHER_UNAVAILABLE_MESSAGE)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Nueva búsqueda" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("No hay ruta posible");
+    expect(screen.queryByTestId("route-list")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Nueva búsqueda" })).not.toBeInTheDocument();
+  });
+
+  it("explains why there is no route instead of showing an empty list", () => {
+    render(
+      <ResultsLayer
+        {...props({
+          viewState: "partial",
+          routes: [],
+          routeAvailable: false,
+          activityLabel: "ciclismo",
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent("No hay ruta posible");
+    expect(screen.getByRole("alert")).toHaveTextContent(/ciclismo/);
+    expect(screen.queryByTestId("route-list")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Nueva búsqueda" })).not.toBeInTheDocument();
   });
 
   it("renders the recommended banner and cards on a full result without partial banners", () => {

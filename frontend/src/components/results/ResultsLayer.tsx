@@ -13,6 +13,7 @@ export interface ResultsLayerProps {
   weatherAvailable: boolean;
   routeAvailable: boolean;
   selectedRouteId: number | null;
+  activityLabel: string;
   onSelectRoute: (routeIndex: number) => void;
   onRetry: () => void;
   onNewSearch: () => void;
@@ -20,7 +21,6 @@ export interface ResultsLayerProps {
 }
 
 const WEATHER_UNAVAILABLE_MESSAGE = "No hay previsión meteorológica para esa fecha — máximo 7 días.";
-const ROUTE_UNAVAILABLE_MESSAGE = "El servicio de rutas no está disponible temporalmente.";
 const DEFAULT_ERROR_MESSAGE = "No se pudo calcular la ruta. Revisa tu conexión e inténtalo de nuevo.";
 
 function PartialBanner({ children }: { children: ReactNode }) {
@@ -37,6 +37,7 @@ export default function ResultsLayer({
   weatherAvailable,
   routeAvailable,
   selectedRouteId,
+  activityLabel,
   onSelectRoute,
   onRetry,
   onNewSearch,
@@ -56,11 +57,18 @@ export default function ResultsLayer({
   }
 
   const hasRoutes = routes.length > 0;
+  const noRouteReason = !routeAvailable;
 
   return (
     <div className="space-y-4">
       {!weatherAvailable && <PartialBanner>{WEATHER_UNAVAILABLE_MESSAGE}</PartialBanner>}
-      {!routeAvailable && <PartialBanner>{ROUTE_UNAVAILABLE_MESSAGE}</PartialBanner>}
+      {noRouteReason && (
+        <ErrorState
+          title="No hay ruta posible"
+          message={`No encontramos ninguna ruta con perfil de ${activityLabel} entre esos dos puntos. Prueba a mover los extremos o a cambiar de actividad.`}
+          onRetry={onRetry}
+        />
+      )}
 
       {hasRoutes ? (
         <RouteList
@@ -71,11 +79,13 @@ export default function ResultsLayer({
           onNewSearch={onNewSearch}
         />
       ) : (
-        <div className="flex justify-end">
-          <Button variant="secondary" onClick={onNewSearch}>
-            Nueva búsqueda
-          </Button>
-        </div>
+        !noRouteReason && (
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={onNewSearch}>
+              Nueva búsqueda
+            </Button>
+          </div>
+        )
       )}
     </div>
   );

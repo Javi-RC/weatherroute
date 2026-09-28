@@ -3305,32 +3305,27 @@ git commit -m "feat: wire the sidebar, map picking and shared camera"
 - Consumes: `routes`, `routeAvailable`, `activityLabel: string`.
 - Produces: a real explanation when the provider returns zero routes — today it renders an empty list with no reason.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
+
+Adapted to current `ResultsLayerProps`: Task 19 removed `expandedRouteId`/`onToggleExpand`/`onCloseDetail`/`onHowCalculated`, and the old "route-service-unavailable banner" test was rewritten (the `Nueva búsqueda` button is now suppressed by `noRouteReason`).
 
 ```tsx
 it("explains why there is no route instead of showing an empty list", () => {
   render(
     <ResultsLayer
-      viewState="partial"
-      routes={[]}
-      weatherAvailable
-      routeAvailable={false}
-      activityLabel="ciclismo"
-      selectedRouteId={null}
-      expandedRouteId={null}
-      onSelectRoute={vi.fn()}
-      onToggleExpand={vi.fn()}
-      onCloseDetail={vi.fn()}
-      onRetry={vi.fn()}
-      onNewSearch={vi.fn()}
-      onHowCalculated={vi.fn()}
-      error={null}
+      {...props({
+        viewState: "partial",
+        routes: [],
+        routeAvailable: false,
+        activityLabel: "ciclismo",
+      })}
     />,
   );
 
-  expect(screen.getByText(/no hay ruta posible/i)).toBeInTheDocument();
-  expect(screen.getByText(/ciclismo/)).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent("No hay ruta posible");
+  expect(screen.getByRole("alert")).toHaveTextContent(/ciclismo/);
   expect(screen.queryByTestId("route-list")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Nueva búsqueda" })).not.toBeInTheDocument();
 });
 ```
 
@@ -3342,7 +3337,7 @@ npm test -- src/components/results/ResultsLayer.test.tsx
 
 Expected: FAIL — the current component renders an empty `<ul>`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add `activityLabel: string` to `ResultsLayerProps`, and in the `hasRoutes` branch's `: (` — i.e. before the `return` at `ResultsLayer.tsx:70` — add an explicit no-route explanation. The current empty branch renders only a "Nueva búsqueda" button, so a provider failure looks identical to "still loading":
 
@@ -3387,7 +3382,7 @@ export const ACTIVITY_LABELS: Record<ActivityType, string> = {
 };
 ```
 
-- [ ] **Step 4: Run it**
+- [x] **Step 4: Run it**
 
 ```bash
 npm test && npm run typecheck
@@ -3401,6 +3396,8 @@ Expected: PASS.
 git add frontend/src/components/results/ frontend/src/App.tsx
 git commit -m "fix: explain an empty route result instead of showing a blank list"
 ```
+
+Adaptations: the old `ROUTE_UNAVAILABLE_MESSAGE` partial banner is dropped (the `ErrorState` replaces it — "service temporarily unavailable" contradicted a simple "no route between endpoints" result; `noRouteReason` suppresses the `Nueva búsqueda` button and the empty list). `App` tracks the last committed `activity` (`useState<ActivityType>("Driving")`, set in `handleSearch` after a run fires) because `PlannerForm` owns the form state; `activityLabel={ACTIVITY_LABELS[activity]}` is passed to `ResultsLayer`.
 
 ---
 
