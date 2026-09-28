@@ -3535,7 +3535,7 @@ git commit -m "chore: drop unused form dependencies"
 **Interfaces:**
 - Consumes: everything above.
 
-- [ ] **Step 1: Backend gate**
+- [x] **Step 1: Backend gate**
 
 ```bash
 dotnet build backend/WeatherRoute.slnx --no-restore -warnaserror
@@ -3544,7 +3544,12 @@ dotnet test backend/WeatherRoute.slnx --filter "Category!=Integration"
 
 Expected: **0 warnings, 0 errors**; all fast tests pass.
 
-- [ ] **Step 2: Frontend gate**
+Note: the gate surfaced a pre-existing break — `tests/` sits outside the `#nullable` context of
+`backend/Directory.Build.props`, so `Api.IntegrationTests` (which uses `?` annotations) failed with
+CS8632. Fixed by enabling `Nullable`+`TreatWarningsAsErrors` on that project and correcting the
+latent nullability mismatches in its stubs (commit `7cd799c`).
+
+- [x] **Step 2: Frontend gate**
 
 ```bash
 cd frontend
@@ -3556,7 +3561,12 @@ npm run build
 
 Expected: clean lint, clean types, all tests, successful build.
 
-- [ ] **Step 3: Integration tests with Docker up**
+`npm run lint` initially failed on `test/stubs/maplibre.ts` (`_point`/`_options`/`_id`/… flagged by
+ESLint's `no-unused-vars` while TS allows `_`-prefixed). Fixed by configuring
+`@typescript-eslint/no-unused-vars` with `^_` ignore patterns to match the repo convention
+(commit `1a2fd8d`).
+
+- [x] **Step 3: Integration tests with Docker up**
 
 ```bash
 dotnet test backend/WeatherRoute.slnx --filter "Category=Integration"
@@ -3564,11 +3574,11 @@ dotnet test backend/WeatherRoute.slnx --filter "Category=Integration"
 
 Expected: PASS. The ORS contract test skips without `OPENROUTESERVICE_API_KEY` — a skip is acceptable, a failure is not.
 
-- [ ] **Step 4: Update the spec status**
+- [x] **Step 4: Update the spec status**
 
 Edit `docs/superpowers/specs/2026-09-28-weatherroute-maps-redesign.md` and tick off the completed items; note anything that shipped differently and why.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A

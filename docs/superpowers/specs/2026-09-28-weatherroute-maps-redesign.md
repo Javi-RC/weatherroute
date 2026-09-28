@@ -5,6 +5,35 @@
 - Rama: `feature/maps-layout`
 - Supplements: `2026-09-21-weatherroute-design.md`, `2026-09-21-weatherroute-ux-redesign.md`
 
+## 0. Estado de la Fase 1
+
+**Completada** (Tasks 11–24, commits `39ecbd0`→…). Frontend: 442 tests verdes,
+`lint`/`typecheck`/`build` limpios. Backend: build `-warnaserror` 0 warnings/errores,
+fast suite 123 tests verdes, suite de integración verde (PostgreSQL vía Testcontainers;
+el test de contrato ORS se omite sin `OPENROUTESERVICE_API_KEY`).
+
+Shipped diferente de lo planificado (motivo en cada caso):
+
+- **`RouteDetailCard` sobre `MapControlBar`**: se posiciona en `left-4 top-20` en vez de
+  `bottom-4 left-4` para no solaparse con la barra de control del mapa en desktop.
+- **Override de punto fijado**: el label del punto marcado se muestra/usar solo mientras
+  el input de texto está vacío; si el usuario escribe, gana el texto (los inputs dejan de
+  desaparecer tras una búsqueda tipada). El marcador se limpia con "Cambiar"/"Nueva búsqueda".
+- **Restauración de link**: seedea solo puntos/labels y dispara el análisis; no siembra el
+  formulario (`activity`/`departureTime` son estado de `PlannerForm`).
+- **`useRouteAnalysis`** (extraído) recibe un arg de efectos (history/toast/selección) y
+  `runAnalysis(search, places)` devuelve si hubo request; `samePlaces`/`lastRef` intactos.
+- **Sin ruta posible**: se reemplaza el banner "servicio no disponible" por un `ErrorState`
+  "No hay ruta posible" con el perfil de actividad (la API devuelve 0 rutas ≠ caída del servicio).
+- **Tests**: los clicks de pick se esperan con `await act(async …)` (un `act` síncrono no
+  drena el `await reverseGeocode`, el segundo click caería en modo "origen") y `beforeEach`
+  resetea `window.history` a `/` (pickear/re-ejecutar escriben la URL).
+- **Gate backend**: `tests/` estaba fuera del contexto `#nullable` de `backend/Directory.Build.props`;
+  el proyecto `Api.IntegrationTests` usaba anotaciones `?`. Se habilitó `Nullable`+`TreatWarningsAsErrors`
+  en ese proyecto y se corrigieron las inconsistencias de nulabilidad latentes en los stubs.
+- **Lint**: se añadió `argsIgnorePattern/varsIgnorePattern/caughtErrorsIgnorePattern: "^_"` a
+  `@typescript-eslint/no-unused-vars` para que ESLint respete la convención `_`-prefijo del repo.
+
 ## 1. Objetivo
 
 Convertir el frontend en un planificador de rutas estilo Google Maps: mapa
