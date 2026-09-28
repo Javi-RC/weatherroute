@@ -115,6 +115,20 @@ underspecified in these places — the code is right, the plan was not:
 - **The probe test asserts the coordinates too**, not just the `•` label, so a
   marker that renders at the wrong place still fails.
 
+### Deviations found while executing Task 15 (2026-09-28)
+
+- **The arrow-key handler cannot index by `pickMode`.** With `pickMode="none"`
+  (the state the toolbar starts in, and the state the plan's own test renders)
+  `MODES.findIndex` returns `-1`, so `ArrowRight` from "Origen" emitted
+  `"origin"` instead of `"destination"` — the plan's test would have failed
+  against the plan's implementation. The handler now resolves the current
+  index from `document.activeElement` and only falls back to `pickMode`, so
+  focus is the source of truth for arrow navigation (which is also what the
+  ARIA toolbar pattern expects).
+- **Two extra cases, 7 in total.** Added "wraps backwards with the left arrow"
+  (the second branch of the handler) and "moves focus with the active mode",
+  because neither `onChange` nor the focus move was covered by the plan's five.
+
 ---
 
 ## File Structure
@@ -1966,7 +1980,7 @@ git commit -m "feat: highlight hovered routes and probe a profile point on the m
 - Consumes: `pickMode: PickMode`, `onChange(mode: PickMode): void`, `onFitView(): void`.
 - Produces: a `role="toolbar"` overlay. `+ Vía` is rendered **disabled** with `title="Llega en la Fase 2"` — visible but not fake-functional.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it("marks the active mode with aria-pressed", () => {
@@ -2003,7 +2017,7 @@ it("moves between modes with the arrow keys", async () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 npm test -- src/components/map/PickModeBar.test.tsx
@@ -2011,7 +2025,7 @@ npm test -- src/components/map/PickModeBar.test.tsx
 
 Expected: FAIL — module does not exist.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```tsx
 import { useRef } from "react";
@@ -2099,7 +2113,7 @@ export default function PickModeBar({ pickMode, onChange, onFitView }: PickModeB
 }
 ```
 
-- [ ] **Step 4: Run it**
+- [x] **Step 4: Run it**
 
 ```bash
 npm test -- src/components/map/PickModeBar.test.tsx && npm run typecheck
@@ -2107,7 +2121,7 @@ npm test -- src/components/map/PickModeBar.test.tsx && npm run typecheck
 
 Expected: PASS, 5 cases.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/map/PickModeBar.tsx frontend/src/components/map/PickModeBar.test.tsx
