@@ -7,7 +7,7 @@ namespace WeatherRoute.Application.Services;
 
 public sealed class RouteSampler : IRouteSampler
 {
-    private const double SegmentKm = 10.0;
+    private const double MaxStepKm = 10.0;
     private const int MaxSamples = 20;
 
     public Route Sample(ExternalRoute route, ActivityType activity, DateTime departureUtc)
@@ -16,8 +16,14 @@ public sealed class RouteSampler : IRouteSampler
         var geometry = route.Geometry;
         var samples = new List<(Coordinates Point, double CumulativeKm)> { (geometry[0], 0) };
 
+        double cur = 0;
+        for (int i = 1; i < geometry.Count; i++)
+            cur += geometry[i - 1].DistanceKmTo(geometry[i]);
+        double step = Math.Min(MaxStepKm, cur / (MaxSamples - 1));
+        if (step <= 0) step = MaxStepKm;
+
         double cum = 0;
-        double target = SegmentKm;
+        double target = step;
         for (int i = 1; i < geometry.Count; i++)
         {
             cum += geometry[i - 1].DistanceKmTo(geometry[i]);
@@ -25,7 +31,7 @@ public sealed class RouteSampler : IRouteSampler
             if (cum >= target)
             {
                 samples.Add((geometry[i], cum));
-                target += SegmentKm;
+                target += step;
             }
         }
         if (samples.Count < 2 || samples[^1].Point != geometry[^1])
