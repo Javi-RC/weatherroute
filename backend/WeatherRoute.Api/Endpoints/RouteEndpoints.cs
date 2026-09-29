@@ -1,3 +1,4 @@
+using System.Globalization;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using WeatherRoute.Application.Dtos;
@@ -25,6 +26,8 @@ public static class RouteEndpoints
             if (!validation.IsValid)
                 return Results.ValidationProblem(validation.ToDictionary());
             var command = new CalculateRouteCommand(request.Origin, request.Destination,
+                ToCoordinates(request.OriginCoordinates),
+                ToCoordinates(request.DestinationCoordinates),
                 request.Activity, request.DepartureTime.Kind == DateTimeKind.Utc
                     ? request.DepartureTime
                     : DateTime.SpecifyKind(request.DepartureTime, DateTimeKind.Utc),
@@ -71,10 +74,23 @@ public static class RouteEndpoints
             IAnalysisRepository repository,
             CancellationToken ct) =>
         {
-            var originCoord = await geocoding.GeocodeAsync(request.Origin, ct);
-            var destinationCoord = await geocoding.GeocodeAsync(request.Destination, ct);
+            if (request.OriginCoordinates is null && string.IsNullOrWhiteSpace(request.Origin))
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["Origin"] = ["Provide origin or originCoordinates."]
+                });
+            if (request.DestinationCoordinates is null && string.IsNullOrWhiteSpace(request.Destination))
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["Destination"] = ["Provide destination or destinationCoordinates."]
+                });
+
+            var originCoord = ToCoordinates(request.OriginCoordinates)
+                ?? await geocoding.GeocodeAsync(request.Origin!, ct);
+            var destinationCoord = ToCoordinates(request.DestinationCoordinates)
+                ?? await geocoding.GeocodeAsync(request.Destination!, ct);
             var record = new RouteAnalysisRecord(
-                Guid.NewGuid(), request.Origin, request.Destination,
+                Guid.NewGuid(), Label(request.Origin, originCoord), Label(request.Destination, destinationCoord),
                 originCoord, destinationCoord,
                 request.Activity,
                 request.DepartureTime.Kind == DateTimeKind.Utc ? request.DepartureTime : DateTime.SpecifyKind(request.DepartureTime, DateTimeKind.Utc),
@@ -84,4 +100,12 @@ public static class RouteEndpoints
             return Results.Created($"/api/routes/analyses/{id}", new { id });
         });
     }
+
+    private static Coordinates? ToCoordinates(CoordinatesDto? dto) =>
+        dto is null ? null : new Coordinates(dto.Latitude, dto.Longitude);
+
+    private static string Label(string? place, Coordinates coordinates) =>
+        string.IsNullOrWhiteSpace(place)
+            ? string.Create(CultureInfo.InvariantCulture, $"{coordinates.Latitude:0.####},{coordinates.Longitude:0.####}")
+            : place;
 }

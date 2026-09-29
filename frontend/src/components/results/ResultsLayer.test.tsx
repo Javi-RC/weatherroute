@@ -43,10 +43,8 @@ function props(overrides: Partial<ResultsLayerProps> = {}): ResultsLayerProps {
     weatherAvailable: true,
     routeAvailable: true,
     selectedRouteId: null,
-    expandedRouteId: null,
+    activityLabel: "caminata",
     onSelectRoute: vi.fn(),
-    onToggleExpand: vi.fn(),
-    onCloseDetail: vi.fn(),
     onRetry: vi.fn(),
     onNewSearch: vi.fn(),
     error: null,
@@ -84,29 +82,66 @@ describe("ResultsLayer", () => {
     render(<ResultsLayer {...props({ viewState: "partial", weatherAvailable: false })} />);
 
     expect(screen.getByText(WEATHER_UNAVAILABLE_MESSAGE)).toBeInTheDocument();
-    expect(screen.getByText("Recomendada")).toBeInTheDocument();
-    expect(screen.getByText("Ruta 1")).toBeInTheDocument();
+    const banner = within(screen.getByRole("region", { name: "Ruta recomendada" }));
+    expect(banner.getByText("Recomendada")).toBeInTheDocument();
+    expect(banner.getByRole("heading", { name: "Ruta 1" })).toBeInTheDocument();
     expect(screen.queryByText(ROUTE_UNAVAILABLE_MESSAGE)).not.toBeInTheDocument();
     expect(screen.queryByText("Lluvia máx.")).not.toBeInTheDocument();
   });
 
-  it("renders the route-service-unavailable banner", () => {
+  it("does not show the weather-unavailable banner when a route is unavailable", () => {
+    render(
+      <ResultsLayer
+        {...props({
+          viewState: "partial",
+          routeAvailable: false,
+          weatherAvailable: false,
+          routes: [],
+        })}
+      />,
+    );
+
+    expect(screen.queryByText(WEATHER_UNAVAILABLE_MESSAGE)).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("No hay ruta posible");
+  });
+
+  it("renders a no-route explanation instead of an empty list", () => {
     render(
       <ResultsLayer
         {...props({ viewState: "partial", routeAvailable: false, routes: [] })}
       />,
     );
 
-    expect(screen.getByText(ROUTE_UNAVAILABLE_MESSAGE)).toBeInTheDocument();
     expect(screen.queryByText(WEATHER_UNAVAILABLE_MESSAGE)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Nueva búsqueda" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("No hay ruta posible");
+    expect(screen.queryByTestId("route-list")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Nueva búsqueda" })).not.toBeInTheDocument();
+  });
+
+  it("explains why there is no route instead of showing an empty list", () => {
+    render(
+      <ResultsLayer
+        {...props({
+          viewState: "partial",
+          routes: [],
+          routeAvailable: false,
+          activityLabel: "ciclismo",
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent("No hay ruta posible");
+    expect(screen.getByRole("alert")).toHaveTextContent(/ciclismo/);
+    expect(screen.queryByTestId("route-list")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Nueva búsqueda" })).not.toBeInTheDocument();
   });
 
   it("renders the recommended banner and cards on a full result without partial banners", () => {
     render(<ResultsLayer {...props({ viewState: "full" })} />);
 
-    expect(screen.getByText("Recomendada")).toBeInTheDocument();
-    expect(screen.getByText("Ruta 1")).toBeInTheDocument();
+    const banner = within(screen.getByRole("region", { name: "Ruta recomendada" }));
+    expect(banner.getByText("Recomendada")).toBeInTheDocument();
+    expect(banner.getByRole("heading", { name: "Ruta 1" })).toBeInTheDocument();
     expect(screen.queryByText(WEATHER_UNAVAILABLE_MESSAGE)).not.toBeInTheDocument();
     expect(screen.queryByText(ROUTE_UNAVAILABLE_MESSAGE)).not.toBeInTheDocument();
   });
@@ -122,30 +157,11 @@ describe("ResultsLayer", () => {
     expect(onSelectRoute).toHaveBeenCalledWith(1);
   });
 
-  it("expands and collapses a route detail through the controlled props", async () => {
-    const user = userEvent.setup();
-    const onToggleExpand = vi.fn();
-    const { rerender } = render(
-      <ResultsLayer {...props({ viewState: "full", expandedRouteId: null, onToggleExpand })} />,
-    );
+  it("no longer renders the detail inside the card", () => {
+    render(<ResultsLayer {...props({ viewState: "full" })} />);
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Ampliar ruta" }));
-    expect(onToggleExpand).toHaveBeenCalledWith(0);
-
-    rerender(
-      <ResultsLayer {...props({ viewState: "full", expandedRouteId: 0 })} />,
-    );
-    const dialog = screen.getByRole("dialog", { name: "Ruta 1" });
-    expect(dialog).toBeInTheDocument();
-    expect(within(dialog).getByRole("meter", { name: "Índice de condiciones" })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Contraer ruta" }));
-    rerender(
-      <ResultsLayer {...props({ viewState: "full", expandedRouteId: null })} />,
-    );
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ampliar ruta" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Ruta 1" })).not.toBeInTheDocument();
   });
 
   it("highlights the selected card", () => {

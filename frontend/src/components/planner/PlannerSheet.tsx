@@ -1,12 +1,28 @@
 import { useState } from "react";
+import type { PickMode } from "../map/MapCanvas";
 import Sheet from "../ui/Sheet";
 import PlannerForm, { type PlannerSearch } from "./PlannerForm";
+import type { ExternalEndpoint } from "./OriginDestinationFields";
 
 export interface PlannerSheetProps {
   busy: boolean;
   onSearch: (search: PlannerSearch) => void;
   onLocationError?: () => void;
   isCompact?: boolean;
+  pickMode: PickMode;
+  externalOrigin: ExternalEndpoint | null;
+  externalDestination: ExternalEndpoint | null;
+  onClearExternalOrigin?: () => void;
+  onClearExternalDestination?: () => void;
+}
+
+function PickHint({ pickMode }: { pickMode: PickMode }) {
+  if (pickMode === "none") return null;
+  return (
+    <p className="mb-3 rounded-lg bg-ocean-50 px-3 py-2 text-xs text-ocean-800" role="status">
+      Haz clic en el mapa para fijar el {pickMode === "origin" ? "origen" : "destino"}.
+    </p>
+  );
 }
 
 export default function PlannerSheet({
@@ -14,6 +30,11 @@ export default function PlannerSheet({
   onSearch,
   onLocationError,
   isCompact = false,
+  pickMode,
+  externalOrigin,
+  externalDestination,
+  onClearExternalOrigin,
+  onClearExternalDestination,
 }: PlannerSheetProps) {
   const [open, setOpen] = useState(false);
 
@@ -33,7 +54,16 @@ export default function PlannerSheet({
           <h2 className="text-lg font-bold text-sand-900">Planificador</h2>
         </header>
         <div className="flex-1 overflow-y-auto p-5">
-          <PlannerForm onSearch={onSearch} onLocationError={onLocationError} busy={busy} />
+          <PickHint pickMode={pickMode} />
+          <PlannerForm
+            onSearch={handleSearch}
+            onLocationError={onLocationError}
+            busy={busy}
+            externalOrigin={externalOrigin}
+            externalDestination={externalDestination}
+            onClearExternalOrigin={onClearExternalOrigin}
+            onClearExternalDestination={onClearExternalDestination}
+          />
         </div>
       </section>
     );
@@ -47,7 +77,16 @@ export default function PlannerSheet({
         title="Planificador"
         onClose={() => setOpen(false)}
       >
-        <PlannerForm onSearch={handleSearch} onLocationError={onLocationError} busy={busy} />
+        <PickHint pickMode={pickMode} />
+        <PlannerForm
+          onSearch={handleSearch}
+          onLocationError={onLocationError}
+          busy={busy}
+          externalOrigin={externalOrigin}
+          externalDestination={externalDestination}
+          onClearExternalOrigin={onClearExternalOrigin}
+          onClearExternalDestination={onClearExternalDestination}
+        />
       </Sheet>
     );
   }

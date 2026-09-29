@@ -24,8 +24,8 @@ public class GeocodeSearchTests : IClassFixture<WebApplicationFactory<Program>>
     public GeocodeSearchTests(WebApplicationFactory<Program> factory) => _factory = factory;
 
     private WebApplicationFactory<Program> Build(
-        IReadOnlyList<GeocodingCandidate> candidates = null,
-        string reverseLabel = null,
+        IReadOnlyList<GeocodingCandidate>? candidates = null,
+        string? reverseLabel = null,
         bool geocodeThrows = false) =>
         _factory.WithWebHostBuilder(b =>
         {
@@ -125,13 +125,13 @@ public class GeocodeSearchTests : IClassFixture<WebApplicationFactory<Program>>
                 : Task.FromResult(new Coordinates(38.0, -4.0));
     }
 
-    private sealed class StubDiscovery(IReadOnlyList<GeocodingCandidate> candidates, string reverseLabel)
+    private sealed class StubDiscovery(IReadOnlyList<GeocodingCandidate>? candidates, string? reverseLabel)
         : IGeocodingDiscoveryProvider
     {
         public Task<IReadOnlyList<GeocodingCandidate>> SearchAsync(string query, CancellationToken ct = default) =>
-            Task.FromResult(candidates);
+            Task.FromResult(candidates ?? []);
 
-        public Task<string> GetPlaceNameAsync(double latitude, double longitude, CancellationToken ct = default) =>
+        public Task<string?> GetPlaceNameAsync(double latitude, double longitude, CancellationToken ct = default) =>
             Task.FromResult(reverseLabel);
     }
 }

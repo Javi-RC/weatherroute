@@ -23,7 +23,7 @@ public class CalculateRouteUseCaseTests
         var useCase = Build(weather);
 
         var result = await useCase.ExecuteAsync(new CalculateRouteCommand(
-            "Ciudad Real", "Almagro", ActivityType.Cycling,
+            "Ciudad Real", "Almagro", null, null, ActivityType.Cycling,
             new DateTime(2026, 9, 27, 8, 0, 0, DateTimeKind.Utc), null));
 
         Assert.Equal("full", result.Status);
@@ -40,7 +40,7 @@ public class CalculateRouteUseCaseTests
         var useCase = Build(weather);
 
         var result = await useCase.ExecuteAsync(new CalculateRouteCommand(
-            "Ciudad Real", "Almagro", ActivityType.Cycling,
+            "Ciudad Real", "Almagro", null, null, ActivityType.Cycling,
             new DateTime(2026, 9, 27, 8, 0, 0, DateTimeKind.Utc), 120));
 
         Assert.Single(result.Routes);                            // fake-a ~66 min (direct geometry) passes, fake-b ~146 min (detour geometry) filtered
@@ -54,7 +54,7 @@ public class CalculateRouteUseCaseTests
         var useCase = Build(failingWeather);
 
         var result = await useCase.ExecuteAsync(new CalculateRouteCommand(
-            "Ciudad Real", "Almagro", ActivityType.Cycling,
+            "Ciudad Real", "Almagro", null, null, ActivityType.Cycling,
             new DateTime(2026, 9, 27, 8, 0, 0, DateTimeKind.Utc), null));
 
         Assert.Equal("partial", result.Status);
@@ -67,7 +67,7 @@ public class CalculateRouteUseCaseTests
     {
         var useCase = Build(new FakeWeather());
         var result = await useCase.ExecuteAsync(new CalculateRouteCommand(
-            "Ciudad Real", "Almagro", ActivityType.Cycling,
+            "Ciudad Real", "Almagro", null, null, ActivityType.Cycling,
             new DateTime(2026, 9, 27, 8, 0, 0, DateTimeKind.Utc), null));
 
         Assert.All(result.Routes, r =>

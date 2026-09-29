@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -6,6 +7,7 @@ using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using WeatherRoute.Application.Dtos;
 using WeatherRoute.Application.Ports.In;
+using WeatherRoute.Domain.ValueObjects;
 
 namespace WeatherRoute.Infrastructure.Caching;
 
@@ -58,17 +60,20 @@ public sealed class CachedCalculateRouteUseCase : ICalculateRouteUseCase
 
         var result = await _inner.ExecuteAsync(command, ct);
 
-        try
+        if (result.RouteAvailable || result.WeatherAvailable)
         {
-            await _cache.SetAsync(key, JsonSerializer.SerializeToUtf8Bytes(result, _json), Ttl(), ct);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogWarning(ex, "Cache write failed for key {CacheKey}; the response is returned without caching.", key);
+            try
+            {
+                await _cache.SetAsync(key, JsonSerializer.SerializeToUtf8Bytes(result, _json), Ttl(), ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Cache write failed for key {CacheKey}; the response is returned without caching.", key);
+            }
         }
 
         return result;
@@ -76,10 +81,20 @@ public sealed class CachedCalculateRouteUseCase : ICalculateRouteUseCase
 
     public static string BuildKey(CalculateRouteCommand command)
     {
-        var raw = $"{command.Origin.ToLowerInvariant()}|{command.Destination.ToLowerInvariant()}|{command.Activity}|{command.DepartureTimeUtc:o}|{command.MaxDurationMinutes}";
+        var raw = string.Join("|",
+            Part(command.OriginCoordinates, command.Origin),
+            Part(command.DestinationCoordinates, command.Destination),
+            command.Activity,
+            $"{command.DepartureTimeUtc:o}",
+            command.MaxDurationMinutes);
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(raw))).ToLowerInvariant();
         return $"route-analysis:{hash}";
     }
+
+    private static string Part(Coordinates? coordinates, string? label) =>
+        coordinates is null
+            ? $"t:{label?.ToLowerInvariant()}"
+            : $"c:{coordinates.Latitude.ToString("F4", CultureInfo.InvariantCulture)},{coordinates.Longitude.ToString("F4", CultureInfo.InvariantCulture)}";
 
     private DistributedCacheEntryOptions Ttl()
     {

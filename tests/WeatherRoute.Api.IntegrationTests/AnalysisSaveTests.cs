@@ -58,7 +58,7 @@ public class AnalysisSaveTests : IClassFixture<WebApplicationFactory<Program>>
         var body = await response.Content.ReadFromJsonAsync<JsonDocument>();
         var saved = captured.Saved;
         Assert.NotNull(saved);
-        Assert.Equal(body.RootElement.GetProperty("id").GetGuid(), saved.Id);
+        Assert.Equal(body!.RootElement.GetProperty("id").GetGuid(), saved.Id);
         Assert.NotEqual(new Coordinates(0, 0), saved.OriginCoordinates);
         Assert.Equal(38.986, saved.OriginCoordinates.Latitude, 3);
         Assert.Equal(-3.929, saved.OriginCoordinates.Longitude, 3);
@@ -76,7 +76,7 @@ public class AnalysisSaveTests : IClassFixture<WebApplicationFactory<Program>>
 
     private sealed class CapturingRepository : IAnalysisRepository
     {
-        public RouteAnalysisRecord Saved { get; private set; }
+        public RouteAnalysisRecord Saved { get; private set; } = null!;
 
         public Task<Guid> SaveAsync(RouteAnalysisRecord record, CancellationToken ct = default)
         {

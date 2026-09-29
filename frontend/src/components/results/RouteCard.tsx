@@ -1,20 +1,18 @@
-import { useId, type ReactNode } from "react";
-import { FaChevronDown, FaChevronUp } from "react-icons/fa";
+import type { KeyboardEvent } from "react";
 import { formatDistance, formatDuration, formatPercent, formatScore, formatWind } from "../../lib/format";
 import type { RouteCandidate, RouteSegment } from "../../types";
 import Card from "../ui/Card";
-import IconButton from "../ui/IconButton";
 import RiskBadge from "../ui/RiskBadge";
 
 export interface RouteCardProps {
   index: number;
   route: RouteCandidate;
   isSelected: boolean;
-  isExpanded: boolean;
+  hasSelection: boolean;
   weatherAvailable: boolean;
   onSelect: (index: number) => void;
-  onToggleExpand: (index: number) => void;
-  children?: ReactNode;
+  onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void;
+  cardRef?: (element: HTMLButtonElement | null) => void;
 }
 
 function maxMetric(segments: RouteSegment[], pick: (segment: RouteSegment) => number | null): number | null {
@@ -40,15 +38,15 @@ export default function RouteCard({
   index,
   route,
   isSelected,
-  isExpanded,
+  hasSelection,
   weatherAvailable,
   onSelect,
-  onToggleExpand,
-  children,
+  onKeyDown,
+  cardRef,
 }: RouteCardProps) {
-  const detailId = useId();
   const maxRain = maxMetric(route.segments, (s) => s.weather?.precipitationProbability ?? null);
   const maxWind = maxMetric(route.segments, (s) => s.weather?.windKmh ?? null);
+  const inTabOrder = isSelected || (!hasSelection && index === 0);
 
   return (
     <Card
@@ -64,6 +62,9 @@ export default function RouteCard({
       <div className="flex items-center gap-3">
         <button
           type="button"
+          ref={cardRef}
+          tabIndex={inTabOrder ? 0 : -1}
+          onKeyDown={onKeyDown}
           onClick={() => onSelect(index)}
           aria-pressed={isSelected}
           className="-m-1 flex min-w-0 flex-1 items-center gap-3 rounded-md p-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ocean-600 focus-visible:ring-offset-2"
@@ -79,14 +80,6 @@ export default function RouteCard({
             <RiskBadge level={route.riskLevel} />
           </span>
         </button>
-        <IconButton
-          label={isExpanded ? "Contraer ruta" : "Ampliar ruta"}
-          aria-expanded={isExpanded}
-          aria-controls={isExpanded ? detailId : undefined}
-          onClick={() => onToggleExpand(index)}
-        >
-          {isExpanded ? <FaChevronUp aria-hidden /> : <FaChevronDown aria-hidden />}
-        </IconButton>
       </div>
 
       <dl className="mt-3 grid grid-cols-3 gap-2">
@@ -100,12 +93,6 @@ export default function RouteCard({
         )}
         <MiniStat label="Índice" value={formatScore(route.riskScore)} />
       </dl>
-
-      {isExpanded && (
-        <div id={detailId} className="mt-4 border-t border-sand-100 pt-4">
-          {children}
-        </div>
-      )}
     </Card>
   );
 }

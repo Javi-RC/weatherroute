@@ -13,17 +13,25 @@ namespace WeatherRoute.Application.Tests;
 
 public sealed class FakeGeocoder : IGeocodingProvider
 {
-    public Task<Coordinates> GeocodeAsync(string query, CancellationToken ct = default) =>
-        Task.FromResult<Coordinates>(query.ToLowerInvariant().Contains("alma")
+    public List<string> Queries { get; } = new();
+
+    public Task<Coordinates> GeocodeAsync(string query, CancellationToken ct = default)
+    {
+        Queries.Add(query);
+        return Task.FromResult<Coordinates>(query.ToLowerInvariant().Contains("alma")
             ? new Coordinates(38.888, -3.712)
             : new Coordinates(38.986, -3.929));
+    }
 }
 
 public sealed class FakeRouteProvider : IRouteProvider
 {
+    public List<(Coordinates Origin, Coordinates Destination)> Calls { get; } = new();
+
     public Task<IReadOnlyList<ExternalRoute>> CalculateRoutesAsync(
-        Coordinates o, Coordinates d, ActivityType a, int alternativeCount, CancellationToken ct = default)
+        Coordinates o, Coordinates d, ActivityType a, CancellationToken ct = default)
     {
+        Calls.Add((o, d));
         var geom = new[] { o, new Coordinates((o.Latitude + d.Latitude) / 2, (o.Longitude + d.Longitude) / 2), d };
         var detour = new Coordinates((o.Latitude + d.Latitude) / 2 - 0.2, (o.Longitude + d.Longitude) / 2);
         var longerGeom = new[] { o, detour, d };

@@ -38,10 +38,9 @@ function route(overrides: Partial<RouteCandidate> = {}): RouteCandidate {
 
 const base = {
   isSelected: false,
-  isExpanded: false,
+  hasSelection: false,
   weatherAvailable: true,
   onSelect: vi.fn(),
-  onToggleExpand: vi.fn(),
 };
 
 describe("RouteCard", () => {
@@ -50,7 +49,7 @@ describe("RouteCard", () => {
 
     expect(screen.getByText("Ruta 1")).toBeInTheDocument();
     expect(screen.getByText("28,6 km")).toBeInTheDocument();
-    expect(screen.getByText("2 h 48 m")).toBeInTheDocument();
+    expect(screen.getByText("2 h 48 min")).toBeInTheDocument();
     expect(screen.getByText("80 %")).toBeInTheDocument();
     expect(screen.getByText("40 km/h")).toBeInTheDocument();
     expect(screen.getByText("71/100")).toBeInTheDocument();
@@ -59,7 +58,7 @@ describe("RouteCard", () => {
   it("selects the route with the same index the map uses", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
-    render(<RouteCard index={1} route={route()} isSelected={false} isExpanded={false} weatherAvailable onSelect={onSelect} onToggleExpand={vi.fn()} />);
+    render(<RouteCard index={1} route={route()} isSelected={false} hasSelection={false} weatherAvailable onSelect={onSelect} />);
 
     await user.click(screen.getByRole("button", { name: /Ruta 2/ }));
     expect(onSelect).toHaveBeenCalledWith(1);
@@ -67,7 +66,7 @@ describe("RouteCard", () => {
 
   it("marks the selected card with a highlight and data-selected", () => {
     const { container } = render(
-      <RouteCard index={0} route={route()} isSelected isExpanded={false} weatherAvailable onSelect={vi.fn()} onToggleExpand={vi.fn()} />,
+      <RouteCard index={0} route={route()} isSelected hasSelection weatherAvailable onSelect={vi.fn()} />,
     );
 
     const card = container.querySelector("[data-route-card]");
@@ -75,43 +74,35 @@ describe("RouteCard", () => {
     expect(card).toHaveClass("ring-2", "ring-ocean-600");
   });
 
-  it("exposes aria-expanded on the chevron and toggles expansion", async () => {
-    const user = userEvent.setup();
-    const onToggleExpand = vi.fn();
+  it("keeps only the selected card in the tab order", () => {
     const { rerender } = render(
-      <RouteCard index={0} route={route()} isSelected={false} isExpanded={false} weatherAvailable onSelect={vi.fn()} onToggleExpand={onToggleExpand} />,
+      <RouteCard index={1} route={route()} isSelected hasSelection weatherAvailable onSelect={vi.fn()} />,
     );
+    expect(screen.getByRole("button", { name: /Ruta 2/ })).toHaveAttribute("tabindex", "0");
 
-    const expand = screen.getByRole("button", { name: "Ampliar ruta" });
-    expect(expand).toHaveAttribute("aria-expanded", "false");
-    await user.click(expand);
-    expect(onToggleExpand).toHaveBeenCalledWith(0);
-
-    rerender(
-      <RouteCard index={0} route={route()} isSelected={false} isExpanded weatherAvailable onSelect={vi.fn()} onToggleExpand={onToggleExpand} />,
-    );
-    const collapse = screen.getByRole("button", { name: "Contraer ruta" });
-    expect(collapse).toHaveAttribute("aria-expanded", "true");
+    rerender(<RouteCard index={1} route={route()} isSelected={false} hasSelection weatherAvailable onSelect={vi.fn()} />);
+    expect(screen.getByRole("button", { name: /Ruta 2/ })).toHaveAttribute("tabindex", "-1");
   });
 
-  it("renders the detail children only when expanded", () => {
-    const { rerender } = render(
-      <RouteCard index={0} route={route()} isSelected={false} isExpanded={false} weatherAvailable onSelect={vi.fn()} onToggleExpand={vi.fn()}>
-        <p>Detalle de la ruta</p>
-      </RouteCard>,
-    );
-    expect(screen.queryByText("Detalle de la ruta")).not.toBeInTheDocument();
+  it("puts the first card in the tab order when nothing is selected", () => {
+    render(<RouteCard index={0} route={route()} isSelected={false} hasSelection={false} weatherAvailable onSelect={vi.fn()} />);
 
-    rerender(
-      <RouteCard index={0} route={route()} isSelected={false} isExpanded weatherAvailable onSelect={vi.fn()} onToggleExpand={vi.fn()}>
-        <p>Detalle de la ruta</p>
-      </RouteCard>,
-    );
-    expect(screen.getByText("Detalle de la ruta")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Ruta 1/ })).toHaveAttribute("tabindex", "0");
+  });
+
+  it("forwards the keyboard handler used for arrow navigation", async () => {
+    const user = userEvent.setup();
+    const onKeyDown = vi.fn();
+    render(<RouteCard index={0} route={route()} isSelected={false} hasSelection={false} weatherAvailable onSelect={vi.fn()} onKeyDown={onKeyDown} />);
+
+    screen.getByRole("button", { name: /Ruta 1/ }).focus();
+    await user.keyboard("{ArrowDown}");
+
+    expect(onKeyDown).toHaveBeenCalled();
   });
 
   it("omits the rain/wind mini-stats when weather is unavailable", () => {
-    render(<RouteCard index={0} route={route()} isSelected={false} isExpanded={false} weatherAvailable={false} onSelect={vi.fn()} onToggleExpand={vi.fn()} />);
+    render(<RouteCard index={0} route={route()} isSelected={false} hasSelection={false} weatherAvailable={false} onSelect={vi.fn()} />);
 
     expect(screen.queryByText("Lluvia máx.")).not.toBeInTheDocument();
     expect(screen.queryByText("Viento máx.")).not.toBeInTheDocument();

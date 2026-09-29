@@ -3,9 +3,7 @@ import type { RouteCandidate } from "../../types";
 import Button from "../ui/Button";
 import ErrorState from "../ui/ErrorState";
 import LoadingState from "../ui/LoadingState";
-import BestRouteBanner from "./BestRouteBanner";
-import RouteCard from "./RouteCard";
-import RouteDetail from "./RouteDetail";
+import RouteList from "./RouteList";
 
 export type ResultsViewState = "idle" | "loading" | "error" | "full" | "partial";
 
@@ -15,18 +13,14 @@ export interface ResultsLayerProps {
   weatherAvailable: boolean;
   routeAvailable: boolean;
   selectedRouteId: number | null;
-  expandedRouteId: number | null;
+  activityLabel: string;
   onSelectRoute: (routeIndex: number) => void;
-  onToggleExpand: (routeIndex: number) => void;
-  onCloseDetail: () => void;
   onRetry: () => void;
   onNewSearch: () => void;
-  onHowCalculated?: () => void;
   error?: string | null;
 }
 
 const WEATHER_UNAVAILABLE_MESSAGE = "No hay previsión meteorológica para esa fecha — máximo 7 días.";
-const ROUTE_UNAVAILABLE_MESSAGE = "El servicio de rutas no está disponible temporalmente.";
 const DEFAULT_ERROR_MESSAGE = "No se pudo calcular la ruta. Revisa tu conexión e inténtalo de nuevo.";
 
 function PartialBanner({ children }: { children: ReactNode }) {
@@ -43,13 +37,10 @@ export default function ResultsLayer({
   weatherAvailable,
   routeAvailable,
   selectedRouteId,
-  expandedRouteId,
+  activityLabel,
   onSelectRoute,
-  onToggleExpand,
-  onCloseDetail,
   onRetry,
   onNewSearch,
-  onHowCalculated,
   error,
 }: ResultsLayerProps) {
   if (viewState === "idle") return null;
@@ -66,45 +57,35 @@ export default function ResultsLayer({
   }
 
   const hasRoutes = routes.length > 0;
+  const noRouteReason = !routeAvailable;
 
   return (
     <div className="space-y-4">
-      {!weatherAvailable && <PartialBanner>{WEATHER_UNAVAILABLE_MESSAGE}</PartialBanner>}
-      {!routeAvailable && <PartialBanner>{ROUTE_UNAVAILABLE_MESSAGE}</PartialBanner>}
+      {!weatherAvailable && hasRoutes && <PartialBanner>{WEATHER_UNAVAILABLE_MESSAGE}</PartialBanner>}
+      {noRouteReason && (
+        <ErrorState
+          title="No hay ruta posible"
+          message={`No encontramos ninguna ruta con perfil de ${activityLabel} entre esos dos puntos. Prueba a mover los extremos o a cambiar de actividad.`}
+          onRetry={onRetry}
+        />
+      )}
 
       {hasRoutes ? (
-        <>
-          <BestRouteBanner routes={routes} onNewSearch={onNewSearch} />
-          <ul data-testid="route-list" className="space-y-3">
-            {routes.map((route, index) => (
-              <li key={`${index}-${route.providerId}`}>
-                <RouteCard
-                  index={index}
-                  route={route}
-                  isSelected={selectedRouteId === index}
-                  isExpanded={expandedRouteId === index}
-                  weatherAvailable={weatherAvailable}
-                  onSelect={onSelectRoute}
-                  onToggleExpand={onToggleExpand}
-                >
-                  <RouteDetail
-                    route={route}
-                    index={index}
-                    weatherAvailable={weatherAvailable}
-                    onClose={onCloseDetail}
-                    onHowCalculated={onHowCalculated}
-                  />
-                </RouteCard>
-              </li>
-            ))}
-          </ul>
-        </>
+        <RouteList
+          routes={routes}
+          weatherAvailable={weatherAvailable}
+          selectedRouteId={selectedRouteId}
+          onSelectRoute={onSelectRoute}
+          onNewSearch={onNewSearch}
+        />
       ) : (
-        <div className="flex justify-end">
-          <Button variant="secondary" onClick={onNewSearch}>
-            Nueva búsqueda
-          </Button>
-        </div>
+        !noRouteReason && (
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={onNewSearch}>
+              Nueva búsqueda
+            </Button>
+          </div>
+        )
       )}
     </div>
   );

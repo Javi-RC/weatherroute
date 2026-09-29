@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
 import maplibregl, { type LngLatLike, type MapLayerMouseEvent } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { formatDistance, formatDuration, formatScore } from "../../lib/format";
@@ -8,7 +8,17 @@ const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 const WORLD_CENTER: [number, number] = [0, 25];
 const WORLD_ZOOM = 2;
 const MIN_ZOOM = 2;
-const SELECTED_NONE = -1;
+const HOVER_NONE = -1;
+const DIMMED_OPACITY = 0.3;
+const PROBE_LABEL = "•";
+
+export type PickMode = "origin" | "destination" | "none";
+
+export interface MapCanvasHandle {
+  fitToRoutes(): void;
+  ensureVisible(point: GeoPoint): void;
+  jumpTo(center: [number, number], zoom: number): void;
+}
 
 export interface MapCanvasProps {
   routes: MapRouteInput[];
@@ -17,6 +27,12 @@ export interface MapCanvasProps {
   originPoint?: GeoPoint;
   destinationPoint?: GeoPoint;
   isCompact?: boolean;
+  hoveredRouteId?: number | null;
+  onHoverRoute?: (routeIndex: number | null) => void;
+  probePoint?: GeoPoint | null;
+  pickMode?: PickMode;
+  onPickPoint?: (point: GeoPoint) => void;
+  onCameraChange?: (center: { lng: number; lat: number }, zoom: number) => void;
 }
 
 interface PaintState {
@@ -24,23 +40,48 @@ interface PaintState {
   selectedRouteId: number | null;
   originPoint?: GeoPoint;
   destinationPoint?: GeoPoint;
+  hoveredRouteId: number | null;
+  probePoint: GeoPoint | null;
+  pickMode: PickMode;
 }
 
-export default function MapCanvas({
-  routes,
-  selectedRouteId,
-  onSelectRoute,
-  originPoint,
-  destinationPoint,
-  isCompact = false,
-}: MapCanvasProps) {
+const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas(
+  {
+    routes,
+    selectedRouteId,
+    onSelectRoute,
+    originPoint,
+    destinationPoint,
+    isCompact = false,
+    hoveredRouteId = null,
+    onHoverRoute,
+    probePoint = null,
+    pickMode = "none",
+    onPickPoint,
+    onCameraChange,
+  },
+  ref,
+) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const paintedRef = useRef(false);
+  const suppressNextMoveEndRef = useRef(false);
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const onSelectRouteRef = useRef(onSelectRoute);
-  const paintStateRef = useRef<PaintState>({ routes, selectedRouteId, originPoint, destinationPoint });
+  const onPickPointRef = useRef(onPickPoint);
+  const onHoverRouteRef = useRef(onHoverRoute);
+  const onCameraChangeRef = useRef(onCameraChange);
+  const pickModeRef = useRef(pickMode);
+  const paintStateRef = useRef<PaintState>({
+    routes,
+    selectedRouteId,
+    originPoint,
+    destinationPoint,
+    hoveredRouteId,
+    probePoint,
+    pickMode,
+  });
   const isCompactRef = useRef(isCompact);
 
   useEffect(() => {
@@ -48,12 +89,36 @@ export default function MapCanvas({
   }, [onSelectRoute]);
 
   useEffect(() => {
+    onPickPointRef.current = onPickPoint;
+  }, [onPickPoint]);
+
+  useEffect(() => {
+    pickModeRef.current = pickMode;
+  }, [pickMode]);
+
+  useEffect(() => {
+    onHoverRouteRef.current = onHoverRoute;
+  }, [onHoverRoute]);
+
+  useEffect(() => {
+    onCameraChangeRef.current = onCameraChange;
+  }, [onCameraChange]);
+
+  useEffect(() => {
     isCompactRef.current = isCompact;
   }, [isCompact]);
 
   useEffect(() => {
-    paintStateRef.current = { routes, selectedRouteId, originPoint, destinationPoint };
-  }, [routes, selectedRouteId, originPoint, destinationPoint]);
+    paintStateRef.current = {
+      routes,
+      selectedRouteId,
+      originPoint,
+      destinationPoint,
+      hoveredRouteId,
+      probePoint,
+      pickMode,
+    };
+  }, [routes, selectedRouteId, originPoint, destinationPoint, hoveredRouteId, probePoint, pickMode]);
 
   const paint = useCallback((map: maplibregl.Map) => {
     const state = paintStateRef.current;
@@ -61,19 +126,23 @@ export default function MapCanvas({
     if (!source) return;
 
     source.setData(buildRouteFeatures(state.routes));
-
-    const selected = state.selectedRouteId ?? SELECTED_NONE;
-    map.setFilter("route-selected", ["==", "$id", selected]);
+    map.setFilter("route-casing", ["==", ["get", "selected"], true]);
+    map.setFilter("route-hover", ["==", "$id", state.hoveredRouteId ?? HOVER_NONE]);
 
     for (const marker of markersRef.current) marker.remove();
     markersRef.current = [];
     const points: Array<[string, GeoPoint]> = [];
     if (state.originPoint) points.push(["A", state.originPoint]);
     if (state.destinationPoint) points.push(["B", state.destinationPoint]);
+    if (state.probePoint) points.push([PROBE_LABEL, state.probePoint]);
     for (const [label, point] of points) {
+      const isProbe = label === PROBE_LABEL;
       const element = document.createElement("div");
-      element.className =
-        "pointer-events-none flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-sand-900 text-xs font-bold text-white shadow-card";
+      element.className = [
+        "pointer-events-none flex h-6 w-6 items-center justify-center rounded-full border-2 border-white",
+        isProbe ? "bg-sun-500 text-sand-900" : "bg-sand-900 text-white",
+        "text-xs font-bold shadow-card",
+      ].join(" ");
       element.setAttribute("aria-hidden", "true");
       element.textContent = label;
       const marker = new maplibregl.Marker({ element })
@@ -81,18 +150,6 @@ export default function MapCanvas({
         .addTo(map);
       markersRef.current.push(marker);
     }
-
-    const coords: GeoPoint[] = [];
-    for (const route of state.routes) {
-      for (const [lng, lat] of route.geometry.coordinates) {
-        coords.push({ latitude: lat, longitude: lng });
-      }
-    }
-    if (coords.length === 0) return;
-    const bounds = computeBounds(coords);
-    if (!bounds) return;
-    const extent = new maplibregl.LngLatBounds([bounds.west, bounds.south], [bounds.east, bounds.north]);
-    map.fitBounds(extent, fitBoundsOptions({ isCompact: isCompactRef.current }));
   }, []);
 
   const showRoutePopup = useCallback((map: maplibregl.Map, routeIndex: number, lngLat: LngLatLike) => {
@@ -122,30 +179,72 @@ export default function MapCanvas({
     map.once("load", () => {
       map.addSource("routes", { type: "geojson", data: buildRouteFeatures([]) });
       map.addLayer({
+        id: "route-casing",
+        type: "line",
+        source: "routes",
+        filter: ["==", ["get", "selected"], true],
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint: { "line-color": "#ffffff", "line-width": 9, "line-opacity": 0.95 },
+      });
+      map.addLayer({
+        id: "route-hover",
+        type: "line",
+        source: "routes",
+        filter: ["==", "$id", HOVER_NONE],
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint: { "line-color": "#ffffff", "line-width": 7, "line-opacity": 0.7 },
+      });
+      map.addLayer({
         id: "route-lines",
         type: "line",
         source: "routes",
+        layout: { "line-join": "round", "line-cap": "round" },
         paint: {
           "line-color": ["get", "color"],
-          "line-width": 4,
-          "line-opacity": 0.9,
+          "line-width": 5,
+          "line-opacity": ["case", ["get", "selected"], 1, DIMMED_OPACITY],
         },
-      });
-      map.addLayer({
-        id: "route-selected",
-        type: "line",
-        source: "routes",
-        paint: {
-          "line-color": ["get", "color"],
-          "line-width": 8,
-          "line-opacity": 1,
-        },
-        filter: ["==", "$id", SELECTED_NONE],
       });
       map.addControl(new maplibregl.NavigationControl(), "top-right");
+      map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
       paintedRef.current = true;
       paint(map);
     });
+
+    const handleMapClick = (event: maplibregl.MapMouseEvent) => {
+      const hits = map.queryRenderedFeatures(event.point, { layers: ["route-lines"] });
+      if (hits.length > 0) return;
+
+      if (pickModeRef.current === "none") return;
+      const pick = onPickPointRef.current;
+      if (!pick) return;
+      pick({ latitude: event.lngLat.lat, longitude: event.lngLat.lng });
+    };
+
+    map.on("click", handleMapClick);
+
+    const handleRouteMouseMove = (event: MapLayerMouseEvent) => {
+      const index = event.features?.[0]?.properties?.routeIndex;
+      if (typeof index !== "number") return;
+      map.getCanvas().style.cursor = "pointer";
+      onHoverRouteRef.current?.(index);
+    };
+    const handleRouteMouseLeave = () => {
+      onHoverRouteRef.current?.(null);
+      map.getCanvas().style.cursor = pickModeRef.current === "none" ? "" : "crosshair";
+    };
+
+    const handleMoveEnd = () => {
+      if (suppressNextMoveEndRef.current) {
+        suppressNextMoveEndRef.current = false;
+        return;
+      }
+      onCameraChangeRef.current?.(map.getCenter(), map.getZoom());
+    };
+
+    map.on("mousemove", "route-lines", handleRouteMouseMove);
+    map.on("mouseleave", "route-lines", handleRouteMouseLeave);
+    map.on("moveend", handleMoveEnd);
 
     map.on("click", "route-lines", (event: MapLayerMouseEvent) => {
       const routeIndex = event.features?.[0]?.properties?.routeIndex as number | undefined;
@@ -159,20 +258,79 @@ export default function MapCanvas({
       popupRef.current = null;
       for (const marker of markersRef.current) marker.remove();
       markersRef.current = [];
+      map.off("click", handleMapClick);
+      map.off("mousemove", "route-lines", handleRouteMouseMove);
+      map.off("mouseleave", "route-lines", handleRouteMouseLeave);
+      map.off("moveend", handleMoveEnd);
       map.remove();
       mapRef.current = null;
       paintedRef.current = false;
+      suppressNextMoveEndRef.current = false;
     };
   }, [paint, showRoutePopup]);
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map) return;
+    map.getCanvas().style.cursor = pickMode === "none" ? "" : "crosshair";
+  }, [pickMode]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map || !paintedRef.current) return;
     paint(map);
-  }, [paint, routes, selectedRouteId, originPoint, destinationPoint, isCompact]);
+  }, [paint, routes, selectedRouteId, originPoint, destinationPoint, isCompact, hoveredRouteId, probePoint]);
 
-  return <div ref={containerRef} data-testid="map-canvas" className="absolute inset-0" />;
-}
+  useImperativeHandle(
+    ref,
+    () => ({
+      fitToRoutes() {
+        const map = mapRef.current;
+        if (!map) return;
+        const coords: GeoPoint[] = [];
+        for (const route of paintStateRef.current.routes) {
+          for (const [lng, lat] of route.geometry.coordinates) {
+            coords.push({ latitude: lat, longitude: lng });
+          }
+        }
+        if (coords.length === 0) return;
+        const bounds = computeBounds(coords);
+        if (!bounds) return;
+        map.fitBounds(
+          new maplibregl.LngLatBounds([bounds.west, bounds.south], [bounds.east, bounds.north]),
+          fitBoundsOptions({ isCompact: isCompactRef.current }),
+        );
+      },
+      ensureVisible(point) {
+        const map = mapRef.current;
+        if (!map) return;
+        const bounds = map.getBounds();
+        const inside =
+          point.longitude >= bounds.getWest() &&
+          point.longitude <= bounds.getEast() &&
+          point.latitude >= bounds.getSouth() &&
+          point.latitude <= bounds.getNorth();
+        if (inside) return;
+        map.easeTo({ center: [point.longitude, point.latitude], duration: 400 });
+      },
+      jumpTo(center, zoom) {
+        const map = mapRef.current;
+        if (!map) return;
+        suppressNextMoveEndRef.current = true;
+        map.jumpTo({ center, zoom });
+      },
+    }),
+    [],
+  );
+
+  return (
+    <div className="absolute inset-0">
+      <div ref={containerRef} data-testid="map-canvas" className="h-full w-full" />
+    </div>
+  );
+});
+
+export default MapCanvas;
 
 function routePopupHtml(route: MapRouteInput): string {
   const parts: string[] = [];

@@ -1,6 +1,7 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { FaLocationArrow } from "react-icons/fa";
 import { reverseGeocode } from "../../services/api";
+import type { GeoPoint } from "../../lib/map";
 import type { PlaceCandidate } from "../../types";
 import Button from "../ui/Button";
 import Field from "../ui/Field";
@@ -11,6 +12,11 @@ export interface PlaceFieldErrors {
   destination?: string;
 }
 
+export interface ExternalEndpoint {
+  label: string;
+  point: GeoPoint;
+}
+
 export interface OriginDestinationFieldsProps {
   origin: string;
   destination: string;
@@ -19,6 +25,9 @@ export interface OriginDestinationFieldsProps {
   onOriginResolved?: (candidate: PlaceCandidate) => void;
   onDestinationResolved?: (candidate: PlaceCandidate) => void;
   onLocationError?: () => void;
+  originOverride?: ExternalEndpoint | null;
+  destinationOverride?: ExternalEndpoint | null;
+  onClearOverride?: (field: "origin" | "destination") => void;
 }
 
 export interface OriginDestinationFieldsHandle {
@@ -50,6 +59,9 @@ const OriginDestinationFields = forwardRef<
     onOriginResolved,
     onDestinationResolved,
     onLocationError,
+    originOverride = null,
+    destinationOverride = null,
+    onClearOverride,
   },
   ref,
 ) {
@@ -64,10 +76,12 @@ const OriginDestinationFields = forwardRef<
   ): PlaceFieldErrors {
     const next = { ...errors };
     if (fields.origin !== undefined) {
-      next.origin = validatePlace("origin", fields.origin);
+      next.origin = originOverride ? undefined : validatePlace("origin", fields.origin);
     }
     if (fields.destination !== undefined) {
-      next.destination = validatePlace("destination", fields.destination);
+      next.destination = destinationOverride
+        ? undefined
+        : validatePlace("destination", fields.destination);
     }
     setErrors(next);
     return next;
@@ -137,26 +151,51 @@ const OriginDestinationFields = forwardRef<
       </Button>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Desde" error={errors.origin} required>
-          <PlaceAutocomplete
-            value={origin}
-            placeholder="Ciudad de salida"
-            onChange={(value) => handleChange("origin", value)}
-            onSelect={(candidate) => handleSelect("origin", candidate)}
-            onBlur={() => handleBlur("origin")}
-          />
+          {originOverride && origin === "" ? (
+            <PickedEndpoint
+              label={originOverride.label}
+              onClear={() => onClearOverride?.("origin")}
+            />
+          ) : (
+            <PlaceAutocomplete
+              value={origin}
+              placeholder="Ciudad de salida"
+              onChange={(value) => handleChange("origin", value)}
+              onSelect={(candidate) => handleSelect("origin", candidate)}
+              onBlur={() => handleBlur("origin")}
+            />
+          )}
         </Field>
         <Field label="Hasta" error={errors.destination} required>
-          <PlaceAutocomplete
-            value={destination}
-            placeholder="Ciudad de llegada"
-            onChange={(value) => handleChange("destination", value)}
-            onSelect={(candidate) => handleSelect("destination", candidate)}
-            onBlur={() => handleBlur("destination")}
-          />
+          {destinationOverride && destination === "" ? (
+            <PickedEndpoint
+              label={destinationOverride.label}
+              onClear={() => onClearOverride?.("destination")}
+            />
+          ) : (
+            <PlaceAutocomplete
+              value={destination}
+              placeholder="Ciudad de llegada"
+              onChange={(value) => handleChange("destination", value)}
+              onSelect={(candidate) => handleSelect("destination", candidate)}
+              onBlur={() => handleBlur("destination")}
+            />
+          )}
         </Field>
       </div>
     </div>
   );
 });
+
+function PickedEndpoint({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <div className="flex h-11 items-center justify-between gap-2 rounded-md border border-ocean-200 bg-ocean-50 px-3">
+      <span className="truncate text-sm font-medium text-sand-900">{label}</span>
+      <Button variant="ghost" size="sm" className="shrink-0" onClick={onClear}>
+        Cambiar
+      </Button>
+    </div>
+  );
+}
 
 export default OriginDestinationFields;

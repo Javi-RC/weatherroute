@@ -27,12 +27,24 @@ export class MapStub {
   layers: Map<string, { id: string; filter?: unknown }>;
   controls: Array<{ control: unknown; position?: string }> = [];
   fitBoundsCalls: Array<{ bounds: LngLatBounds; options?: Record<string, unknown> }> = [];
+  center: [number, number];
+  zoomLevel: number;
+  canvas: HTMLCanvasElement;
+  renderedFeatures: unknown[] = [];
+  easeToCalls: Array<Record<string, unknown>> = [];
+  jumpToCalls: Array<Record<string, unknown>> = [];
   private listeners: Map<string, RegisteredListener[]> = new Map();
 
   constructor(options: MapOptions) {
     this.options = options;
     this.sources = new Map();
     this.layers = new Map();
+    this.canvas = document.createElement("canvas");
+    this.center = options.center;
+    this.zoomLevel = options.zoom;
+    this.renderedFeatures = [];
+    this.easeToCalls = [];
+    this.jumpToCalls = [];
     MapStub.instances.push(this);
   }
 
@@ -93,6 +105,53 @@ export class MapStub {
 
   isStyleLoaded(): boolean {
     return false;
+  }
+
+  queryRenderedFeatures(_point: unknown, _options?: unknown): unknown[] {
+    return this.renderedFeatures;
+  }
+
+  getCanvas(): HTMLCanvasElement {
+    return this.canvas;
+  }
+
+  getCenter(): [number, number] {
+    return this.center;
+  }
+
+  getZoom(): number {
+    return this.zoomLevel;
+  }
+
+  getBounds(): LngLatBounds {
+    const bounds = new LngLatBounds();
+    bounds.extend(this.center);
+    return bounds;
+  }
+
+  easeTo(options: Record<string, unknown>): this {
+    this.easeToCalls.push(options);
+    if (Array.isArray(options.center)) this.center = options.center as [number, number];
+    if (typeof options.zoom === "number") this.zoomLevel = options.zoom;
+    this._emit("moveend");
+    return this;
+  }
+
+  jumpTo(options: Record<string, unknown>): this {
+    this.jumpToCalls.push(options);
+    if (Array.isArray(options.center)) this.center = options.center as [number, number];
+    if (typeof options.zoom === "number") this.zoomLevel = options.zoom;
+    this._emit("moveend");
+    return this;
+  }
+
+  setPaintProperty(_id: string, _name: string, _value: unknown): this {
+    return this;
+  }
+
+  removeLayer(id: string): this {
+    this.layers.delete(id);
+    return this;
   }
 
   addControl(control: unknown, position?: string): this {
@@ -257,6 +316,34 @@ export class Popup {
 
 export class NavigationControl {}
 
+export class ScaleControl {
+  static instances: ScaleControl[] = [];
+  static reset(): void {
+    ScaleControl.instances = [];
+  }
+
+  options: Record<string, unknown>;
+
+  constructor(options: Record<string, unknown> = {}) {
+    this.options = options;
+    ScaleControl.instances.push(this);
+  }
+}
+
+export class GeolocateControl {
+  static instances: GeolocateControl[] = [];
+  static reset(): void {
+    GeolocateControl.instances = [];
+  }
+
+  options: Record<string, unknown>;
+
+  constructor(options: Record<string, unknown> = {}) {
+    this.options = options;
+    GeolocateControl.instances.push(this);
+  }
+}
+
 export { MapStub as Map };
 
 const maplibregl = {
@@ -266,6 +353,8 @@ const maplibregl = {
   Marker,
   Popup,
   NavigationControl,
+  ScaleControl,
+  GeolocateControl,
 };
 
 export default maplibregl;

@@ -64,7 +64,7 @@ public class CachedCalculateRouteUseCaseResilienceTests
     }
 
     private static CalculateRouteCommand Command() =>
-        new("Ciudad Real", "Almagro", ActivityType.Cycling, new DateTime(2026, 9, 27, 8, 0, 0, DateTimeKind.Utc));
+        new("Ciudad Real", "Almagro", null, null, ActivityType.Cycling, new DateTime(2026, 9, 27, 8, 0, 0, DateTimeKind.Utc));
 
     private sealed class FakeInner(Func<RouteAnalysisResponse> factory) : ICalculateRouteUseCase
     {

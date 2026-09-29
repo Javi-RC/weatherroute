@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, geocodePlace, reverseGeocode, searchPlaces } from "./api";
+import { analyzeRoute, ApiError, geocodePlace, reverseGeocode, searchPlaces } from "./api";
 import type { GeocodeResult } from "../types";
 
 afterEach(() => vi.restoreAllMocks());
@@ -150,5 +150,46 @@ describe("reverseGeocode", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(null, { status }));
 
     await expect(reverseGeocode(0, 0)).rejects.toMatchObject({ code: "reverse_geocode_failed" });
+  });
+});
+
+describe("analyzeRoute", () => {
+  const EMPTY_ANALYSIS = { status: "full", weatherAvailable: true, routeAvailable: true, routes: [] };
+
+  it("sends coordinates in the analyze body", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse(EMPTY_ANALYSIS));
+
+    await analyzeRoute({
+      origin: "Madrid",
+      originCoordinates: { latitude: 40.4168, longitude: -3.7038 },
+      destination: "Toledo",
+      destinationCoordinates: { latitude: 39.8628, longitude: -4.0273 },
+      activity: "Cycling",
+      departureTime: "2026-09-28T08:00:00Z",
+    });
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(body.originCoordinates).toEqual({ latitude: 40.4168, longitude: -3.7038 });
+    expect(body.destinationCoordinates).toEqual({ latitude: 39.8628, longitude: -4.0273 });
+  });
+
+  it("can analyze a route that has only coordinates", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse(EMPTY_ANALYSIS));
+
+    await analyzeRoute({
+      originCoordinates: { latitude: 40.4168, longitude: -3.7038 },
+      destinationCoordinates: { latitude: 39.8628, longitude: -4.0273 },
+      activity: "Cycling",
+      departureTime: "2026-09-28T08:00:00Z",
+    });
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(body.origin).toBeUndefined();
+    expect(body.destination).toBeUndefined();
+    expect(body.originCoordinates).toEqual({ latitude: 40.4168, longitude: -3.7038 });
   });
 });
