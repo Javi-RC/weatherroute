@@ -79,6 +79,27 @@ public class OpenRouteServiceRoutingAdapterTests
     }
 
     [Fact]
+    public async Task Routing_Sends_Snap_Radius_Per_Coordinate()
+    {
+        var adapter = Build(req =>
+        {
+            Assert.EndsWith("driving-car/geojson", req.RequestUri!.PathAndQuery);
+            using var body = JsonDocument.ParseAsync(req.Content!.ReadAsStreamAsync().Result)
+                .ConfigureAwait(false).GetAwaiter().GetResult();
+            var radiuses = body.RootElement.GetProperty("radiuses");
+            Assert.Equal(JsonValueKind.Array, radiuses.ValueKind);
+            Assert.Equal(2, radiuses.GetArrayLength());
+            Assert.All(radiuses.EnumerateArray(), r => Assert.Equal(3000, r.GetDouble()));
+            return """{"features":[]}""";
+        });
+
+        _ = await ((IRouteProvider)adapter).CalculateRoutesAsync(
+            new Coordinates(38.986, -3.929),
+            new Coordinates(38.97, -3.912),
+            ActivityType.Driving);
+    }
+
+    [Fact]
     public async Task Routing_Api_Errors_Propagate()
     {
         var client = new HttpClient(new StubHandler(_ => throw new HttpRequestException("boom")))

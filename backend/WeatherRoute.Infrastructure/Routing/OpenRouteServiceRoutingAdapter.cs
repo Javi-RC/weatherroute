@@ -10,6 +10,7 @@ namespace WeatherRoute.Infrastructure.Routing;
 public sealed class OpenRouteServiceRoutingAdapter : IGeocodingProvider, IRouteProvider, IGeocodingDiscoveryProvider
 {
     private const int MaxSearchCandidates = 6;
+    private const double SnapRadiusMeters = 3000;
 
     private readonly HttpClient _http;
     private readonly OpenRouteServiceOptions _options;
@@ -89,6 +90,7 @@ public sealed class OpenRouteServiceRoutingAdapter : IGeocodingProvider, IRouteP
         req.Content = new StringContent(JsonSerializer.Serialize(new
         {
             coordinates = new[] { new[] { origin.Longitude, origin.Latitude }, new[] { destination.Longitude, destination.Latitude } },
+            radiuses = new[] { SnapRadiusMeters, SnapRadiusMeters },
             geometry = true,
             instructions = false
         }), Encoding.UTF8, "application/json");

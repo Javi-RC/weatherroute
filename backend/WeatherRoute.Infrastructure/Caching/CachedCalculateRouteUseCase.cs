@@ -60,17 +60,20 @@ public sealed class CachedCalculateRouteUseCase : ICalculateRouteUseCase
 
         var result = await _inner.ExecuteAsync(command, ct);
 
-        try
+        if (result.RouteAvailable || result.WeatherAvailable)
         {
-            await _cache.SetAsync(key, JsonSerializer.SerializeToUtf8Bytes(result, _json), Ttl(), ct);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogWarning(ex, "Cache write failed for key {CacheKey}; the response is returned without caching.", key);
+            try
+            {
+                await _cache.SetAsync(key, JsonSerializer.SerializeToUtf8Bytes(result, _json), Ttl(), ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Cache write failed for key {CacheKey}; the response is returned without caching.", key);
+            }
         }
 
         return result;
