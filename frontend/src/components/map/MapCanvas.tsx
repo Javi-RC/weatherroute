@@ -65,6 +65,7 @@ const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const paintedRef = useRef(false);
+  const suppressNextMoveEndRef = useRef(false);
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const onSelectRouteRef = useRef(onSelectRoute);
@@ -234,6 +235,10 @@ const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas
     };
 
     const handleMoveEnd = () => {
+      if (suppressNextMoveEndRef.current) {
+        suppressNextMoveEndRef.current = false;
+        return;
+      }
       onCameraChangeRef.current?.(map.getCenter(), map.getZoom());
     };
 
@@ -260,6 +265,7 @@ const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas
       map.remove();
       mapRef.current = null;
       paintedRef.current = false;
+      suppressNextMoveEndRef.current = false;
     };
   }, [paint, showRoutePopup]);
 
@@ -310,13 +316,18 @@ const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas
       jumpTo(center, zoom) {
         const map = mapRef.current;
         if (!map) return;
+        suppressNextMoveEndRef.current = true;
         map.jumpTo({ center, zoom });
       },
     }),
     [],
   );
 
-  return <div ref={containerRef} data-testid="map-canvas" className="absolute inset-0" />;
+  return (
+    <div className="absolute inset-0">
+      <div ref={containerRef} data-testid="map-canvas" className="h-full w-full" />
+    </div>
+  );
 });
 
 export default MapCanvas;

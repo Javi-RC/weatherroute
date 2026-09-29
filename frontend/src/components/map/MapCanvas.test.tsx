@@ -420,6 +420,43 @@ describe("MapCanvas", () => {
     expect(map.easeToCalls[0]).toMatchObject({ center: [-3.7038, 40.4168] });
   });
 
+  it("does not echo its own programmatic jumpTo back to onCameraChange", () => {
+    const onCameraChange = vi.fn();
+    const ref = createRef<MapCanvasHandle>();
+    render(
+      <MapCanvas
+        ref={ref}
+        routes={[]}
+        selectedRouteId={null}
+        onSelectRoute={vi.fn()}
+        onCameraChange={onCameraChange}
+      />,
+    );
+    const map = StubMap.instances.at(-1)!;
+    emitLoad(map);
+
+    act(() => ref.current?.jumpTo([2.5, 40.0], 5));
+    expect(map.jumpToCalls).toHaveLength(1);
+    expect(onCameraChange).not.toHaveBeenCalled();
+  });
+
+  it("reports user-driven camera changes to onCameraChange", () => {
+    const onCameraChange = vi.fn();
+    render(
+      <MapCanvas
+        routes={[]}
+        selectedRouteId={null}
+        onSelectRoute={vi.fn()}
+        onCameraChange={onCameraChange}
+      />,
+    );
+    const map = StubMap.instances.at(-1)!;
+    emitLoad(map);
+
+    act(() => map._emit("moveend"));
+    expect(onCameraChange).toHaveBeenCalled();
+  });
+
   it("highlights the hovered route and reports it", () => {
     const onHoverRoute = vi.fn();
     render(
