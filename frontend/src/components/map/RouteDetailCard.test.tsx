@@ -77,7 +77,7 @@ describe("RouteDetailCard", () => {
     renderCard();
 
     expect(screen.getByRole("heading", { name: /ors/i })).toHaveTextContent("12,5 km");
-    expect(screen.getByRole("heading", { name: /ors/i })).toHaveTextContent("1 h 15 m");
+    expect(screen.getByRole("heading", { name: /ors/i })).toHaveTextContent("1 h 15 min");
   });
 
   it("lists the risk factors and the per-segment weather", () => {

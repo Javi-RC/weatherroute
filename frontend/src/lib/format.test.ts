@@ -20,11 +20,11 @@ describe("formatDistance", () => {
 
 describe("formatDuration", () => {
   it("renders sub-hour durations as minutes only", () => {
-    expect(formatDuration(45)).toBe("45 m");
+    expect(formatDuration(45)).toBe("45 min");
   });
 
-  it("renders zero as 0 m", () => {
-    expect(formatDuration(0)).toBe("0 m");
+  it("renders zero as 0 min", () => {
+    expect(formatDuration(0)).toBe("0 min");
   });
 
   it("omits the minutes part on exact hours", () => {
@@ -32,11 +32,11 @@ describe("formatDuration", () => {
   });
 
   it("renders hours and minutes together", () => {
-    expect(formatDuration(168)).toBe("2 h 48 m");
+    expect(formatDuration(168)).toBe("2 h 48 min");
   });
 
   it("rounds fractional minutes before splitting", () => {
-    expect(formatDuration(45.4)).toBe("45 m");
+    expect(formatDuration(45.4)).toBe("45 min");
     expect(formatDuration(119.6)).toBe("2 h");
   });
 });

@@ -1,5 +1,4 @@
 import type { RiskLevel, RouteCandidate } from "../types";
-import { conditionsLabel } from "./risk";
 
 const SEVERITY: Record<RiskLevel, number> = {
   Low: 0,
@@ -20,14 +19,4 @@ export function findBestRouteIndex(routes: RouteCandidate[]): number {
     if (better) bestIndex = i;
   }
   return bestIndex;
-}
-
-export function buildRecommendation(routes: RouteCandidate[]): string | null {
-  if (routes.length === 0) return null;
-
-  const bestIndex = findBestRouteIndex(routes);
-  const best = routes[bestIndex];
-  const km = Math.round(best.distanceKm);
-  const min = Math.round(best.durationMinutes);
-  return `Ruta ${bestIndex + 1} recomendada: ${km} km, ${min} min, condiciones ${conditionsLabel(best.riskScore)}`;
 }

@@ -49,7 +49,7 @@ describe("RouteCard", () => {
 
     expect(screen.getByText("Ruta 1")).toBeInTheDocument();
     expect(screen.getByText("28,6 km")).toBeInTheDocument();
-    expect(screen.getByText("2 h 48 m")).toBeInTheDocument();
+    expect(screen.getByText("2 h 48 min")).toBeInTheDocument();
     expect(screen.getByText("80 %")).toBeInTheDocument();
     expect(screen.getByText("40 km/h")).toBeInTheDocument();
     expect(screen.getByText("71/100")).toBeInTheDocument();

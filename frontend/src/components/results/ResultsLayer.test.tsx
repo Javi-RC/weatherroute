@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { RouteCandidate, RouteSegment } from "../../types";
@@ -82,8 +82,9 @@ describe("ResultsLayer", () => {
     render(<ResultsLayer {...props({ viewState: "partial", weatherAvailable: false })} />);
 
     expect(screen.getByText(WEATHER_UNAVAILABLE_MESSAGE)).toBeInTheDocument();
-    expect(screen.getByText("Recomendada")).toBeInTheDocument();
-    expect(screen.getByText("Ruta 1")).toBeInTheDocument();
+    const banner = within(screen.getByRole("region", { name: "Ruta recomendada" }));
+    expect(banner.getByText("Recomendada")).toBeInTheDocument();
+    expect(banner.getByRole("heading", { name: "Ruta 1" })).toBeInTheDocument();
     expect(screen.queryByText(ROUTE_UNAVAILABLE_MESSAGE)).not.toBeInTheDocument();
     expect(screen.queryByText("Lluvia máx.")).not.toBeInTheDocument();
   });
@@ -138,8 +139,9 @@ describe("ResultsLayer", () => {
   it("renders the recommended banner and cards on a full result without partial banners", () => {
     render(<ResultsLayer {...props({ viewState: "full" })} />);
 
-    expect(screen.getByText("Recomendada")).toBeInTheDocument();
-    expect(screen.getByText("Ruta 1")).toBeInTheDocument();
+    const banner = within(screen.getByRole("region", { name: "Ruta recomendada" }));
+    expect(banner.getByText("Recomendada")).toBeInTheDocument();
+    expect(banner.getByRole("heading", { name: "Ruta 1" })).toBeInTheDocument();
     expect(screen.queryByText(WEATHER_UNAVAILABLE_MESSAGE)).not.toBeInTheDocument();
     expect(screen.queryByText(ROUTE_UNAVAILABLE_MESSAGE)).not.toBeInTheDocument();
   });

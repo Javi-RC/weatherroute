@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
@@ -188,8 +188,9 @@ describe("App", () => {
     await typeAndSearch();
 
     expect(await screen.findByText("Recomendada")).toBeInTheDocument();
-    expect(screen.getByText("Ruta 1")).toBeInTheDocument();
-    expect(screen.getByText("Ruta 2")).toBeInTheDocument();
+    const cards = within(screen.getByTestId("route-list"));
+    expect(cards.getByText("Ruta 1")).toBeInTheDocument();
+    expect(cards.getByText("Ruta 2")).toBeInTheDocument();
     expect(screen.getAllByText("Distancia").length).toBeGreaterThan(0);
     expect(screen.getAllByRole("meter", { name: "Índice de condiciones" }).length).toBeGreaterThan(0);
     expect(screen.queryByText(WELCOME_TITLE)).not.toBeInTheDocument();
@@ -227,7 +228,7 @@ describe("App", () => {
     // debounced: exactly one new analyze request, previous results stay visible
     await waitFor(() => expect(calls.analyze).toBe(2));
     expect(screen.getByText("Actualizando…")).toBeInTheDocument();
-    expect(screen.getByText("Ruta 1")).toBeInTheDocument();
+    expect(within(screen.getByTestId("route-list")).getByText("Ruta 1")).toBeInTheDocument();
 
     await act(async () => {
       resolveRefresh?.();
@@ -435,7 +436,7 @@ describe("App", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("No se pudo actualizar la ruta");
-    expect(screen.getByText("Ruta 1")).toBeInTheDocument();
+    expect(within(screen.getByTestId("route-list")).getByText("Ruta 1")).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText("Actualizando…")).not.toBeInTheDocument());
     expect(calls.analyze).toBe(2);
   });

@@ -12,8 +12,8 @@ export function formatDuration(min: number): string {
   const total = Math.round(min);
   const hours = Math.floor(total / 60);
   const minutes = total % 60;
-  if (hours > 0) return minutes === 0 ? `${hours} h` : `${hours} h ${minutes} m`;
-  return `${minutes} m`;
+  if (hours > 0) return minutes === 0 ? `${hours} h` : `${hours} h ${minutes} min`;
+  return `${minutes} min`;
 }
 
 export function formatPercent(n: number): string {
