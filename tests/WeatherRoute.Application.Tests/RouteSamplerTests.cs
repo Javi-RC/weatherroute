@@ -41,4 +41,18 @@ public class RouteSamplerTests
         Assert.Single(route.Segments);
         Assert.Equal(2, route.TotalDistance.Km, 1);
     }
+
+    [Fact]
+    public void Long_Route_Beyond_Max_Samples_Reports_Full_Distance()
+    {
+        var sampler = new RouteSampler();
+        var route = sampler.Sample(StraightLine(500, 5001), Domain.Enums.ActivityType.Cycling,
+            new DateTime(2026, 9, 27, 8, 0, 0, DateTimeKind.Utc));
+
+        Assert.True(route.TotalDistance.Km > 480);
+        Assert.Equal(19, route.Segments.Count);
+        Assert.Equal(route.Geometry[^1], route.Segments[^1].End);
+        var last = route.Segments[^1];
+        Assert.NotNull(last.ArrivalTime);
+    }
 }

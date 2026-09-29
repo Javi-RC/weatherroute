@@ -18,9 +18,10 @@ public sealed class RouteSampler : IRouteSampler
 
         double cum = 0;
         double target = SegmentKm;
-        for (int i = 1; i < geometry.Count && samples.Count < MaxSamples; i++)
+        for (int i = 1; i < geometry.Count; i++)
         {
             cum += geometry[i - 1].DistanceKmTo(geometry[i]);
+            if (samples.Count >= MaxSamples) continue;
             if (cum >= target)
             {
                 samples.Add((geometry[i], cum));
