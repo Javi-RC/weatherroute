@@ -10,6 +10,5 @@ public interface IRouteProvider
         Coordinates origin,
         Coordinates destination,
         ActivityType activity,
-        int alternativeCount,
         CancellationToken ct = default);
 }

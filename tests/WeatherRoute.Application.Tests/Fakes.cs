@@ -29,7 +29,7 @@ public sealed class FakeRouteProvider : IRouteProvider
     public List<(Coordinates Origin, Coordinates Destination)> Calls { get; } = new();
 
     public Task<IReadOnlyList<ExternalRoute>> CalculateRoutesAsync(
-        Coordinates o, Coordinates d, ActivityType a, int alternativeCount, CancellationToken ct = default)
+        Coordinates o, Coordinates d, ActivityType a, CancellationToken ct = default)
     {
         Calls.Add((o, d));
         var geom = new[] { o, new Coordinates((o.Latitude + d.Latitude) / 2, (o.Longitude + d.Longitude) / 2), d };

@@ -39,7 +39,7 @@ public sealed class CalculateRouteUseCase : ICalculateRouteUseCase
         {
             var origin = command.OriginCoordinates ?? await GeocodeAsync(command.Origin, ct);
             var destination = command.DestinationCoordinates ?? await GeocodeAsync(command.Destination, ct);
-            var external = await _routes.CalculateRoutesAsync(origin, destination, command.Activity, 2, ct);
+            var external = await _routes.CalculateRoutesAsync(origin, destination, command.Activity, ct);
 
             var candidates = new List<RouteCandidate>();
             bool anyWeather = false;

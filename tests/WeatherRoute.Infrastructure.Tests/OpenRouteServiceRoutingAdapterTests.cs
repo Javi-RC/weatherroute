@@ -25,7 +25,7 @@ public class OpenRouteServiceRoutingAdapterTests
     {
         var adapter = Build(req =>
         {
-            Assert.StartsWith("/v2/geocode/search?text=", req.RequestUri!.PathAndQuery);
+            Assert.StartsWith("/geocode/search?text=", req.RequestUri!.PathAndQuery);
             Assert.Equal("secret-key", req.Headers.GetValues("Authorization").Single());
             return """
             {"features":[{"geometry":{"type":"Point","coordinates":[-3.929,38.986]}}]}
@@ -51,14 +51,14 @@ public class OpenRouteServiceRoutingAdapterTests
     {
         var adapter = Build(req =>
         {
-            Assert.EndsWith("cycling-regular", req.RequestUri!.PathAndQuery);
+            Assert.EndsWith("cycling-regular/geojson", req.RequestUri!.PathAndQuery);
             using var body = JsonDocument.ParseAsync(req.Content!.ReadAsStreamAsync().Result)
                 .ConfigureAwait(false).GetAwaiter().GetResult();
-            Assert.True(body.RootElement.TryGetProperty("alternative_routes", out _));
+            Assert.False(body.RootElement.TryGetProperty("alternative_routes", out _));
             return """
-            {"routes":[
+            {"features":[
               {
-                "summary":{"distance":74200,"duration":10080},
+                "properties":{"summary":{"distance":74200.6,"duration":10080.5}},
                 "geometry":{"type":"LineString","coordinates":[[-3.929,38.986],[-3.912,38.97]]}
               }
             ]}
@@ -68,8 +68,7 @@ public class OpenRouteServiceRoutingAdapterTests
         var routes = await ((IRouteProvider)adapter).CalculateRoutesAsync(
             new Coordinates(38.986, -3.929),
             new Coordinates(38.97, -3.912),
-            ActivityType.Cycling,
-            alternativeCount: 2);
+            ActivityType.Cycling);
 
         var route = Assert.Single(routes);
         Assert.Equal(74.2, route.DistanceKm, 1);
@@ -89,7 +88,7 @@ public class OpenRouteServiceRoutingAdapterTests
         var adapter = new OpenRouteServiceRoutingAdapter(client, new OpenRouteServiceOptions { ApiKey = "k" });
         _ = await Assert.ThrowsAsync<HttpRequestException>(() =>
             ((IRouteProvider)adapter).CalculateRoutesAsync(
-                new Coordinates(0, 0), new Coordinates(1, 1), ActivityType.Driving, 0));
+                new Coordinates(0, 0), new Coordinates(1, 1), ActivityType.Driving));
     }
 
     [Fact]
@@ -97,7 +96,7 @@ public class OpenRouteServiceRoutingAdapterTests
     {
         var adapter = Build(req =>
         {
-            Assert.StartsWith("/v2/geocode/search?text=", req.RequestUri!.PathAndQuery);
+            Assert.StartsWith("/geocode/search?text=", req.RequestUri!.PathAndQuery);
             Assert.Equal("secret-key", req.Headers.GetValues("Authorization").Single());
             return """
             {"features":[
@@ -149,7 +148,7 @@ public class OpenRouteServiceRoutingAdapterTests
     {
         var adapter = Build(req =>
         {
-            Assert.StartsWith("/v2/geocode/reverse?point.lon=", req.RequestUri!.PathAndQuery);
+            Assert.StartsWith("/geocode/reverse?point.lon=", req.RequestUri!.PathAndQuery);
             Assert.Contains("point.lat=", req.RequestUri!.PathAndQuery);
             Assert.Contains("size=1", req.RequestUri!.PathAndQuery);
             return """{"features":[{"properties":{"label":"Ciudad Real, España"}}]}""";

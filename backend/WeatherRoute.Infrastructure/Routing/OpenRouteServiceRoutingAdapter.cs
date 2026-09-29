@@ -25,8 +25,8 @@ public sealed class OpenRouteServiceRoutingAdapter : IGeocodingProvider, IRouteP
         if (string.IsNullOrWhiteSpace(query))
             throw new GeocodingException("Query cannot be empty.");
         var encoded = Uri.EscapeDataString(query.Trim());
-        using var req = new HttpRequestMessage(HttpMethod.Get, $"/v2/geocode/search?text={encoded}");
-        req.Headers.Add("Authorization", _options.ApiKey);
+        using var req = new HttpRequestMessage(HttpMethod.Get, $"/geocode/search?text={encoded}");
+        req.Headers.TryAddWithoutValidation("Authorization", _options.ApiKey);
         using var resp = await _http.SendAsync(req, ct);
         resp.EnsureSuccessStatusCode();
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
@@ -42,8 +42,8 @@ public sealed class OpenRouteServiceRoutingAdapter : IGeocodingProvider, IRouteP
         if (string.IsNullOrWhiteSpace(query))
             return Array.Empty<GeocodingCandidate>();
         var encoded = Uri.EscapeDataString(query.Trim());
-        using var req = new HttpRequestMessage(HttpMethod.Get, $"/v2/geocode/search?text={encoded}");
-        req.Headers.Add("Authorization", _options.ApiKey);
+        using var req = new HttpRequestMessage(HttpMethod.Get, $"/geocode/search?text={encoded}");
+        req.Headers.TryAddWithoutValidation("Authorization", _options.ApiKey);
         using var resp = await _http.SendAsync(req, ct);
         resp.EnsureSuccessStatusCode();
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
@@ -67,8 +67,8 @@ public sealed class OpenRouteServiceRoutingAdapter : IGeocodingProvider, IRouteP
     public async Task<string?> GetPlaceNameAsync(double latitude, double longitude, CancellationToken ct = default)
     {
         using var req = new HttpRequestMessage(HttpMethod.Get,
-            $"/v2/geocode/reverse?point.lon={longitude.ToString(System.Globalization.CultureInfo.InvariantCulture)}&point.lat={latitude.ToString(System.Globalization.CultureInfo.InvariantCulture)}&size=1");
-        req.Headers.Add("Authorization", _options.ApiKey);
+            $"/geocode/reverse?point.lon={longitude.ToString(System.Globalization.CultureInfo.InvariantCulture)}&point.lat={latitude.ToString(System.Globalization.CultureInfo.InvariantCulture)}&size=1");
+        req.Headers.TryAddWithoutValidation("Authorization", _options.ApiKey);
         using var resp = await _http.SendAsync(req, ct);
         resp.EnsureSuccessStatusCode();
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
@@ -81,16 +81,14 @@ public sealed class OpenRouteServiceRoutingAdapter : IGeocodingProvider, IRouteP
         Coordinates origin,
         Coordinates destination,
         ActivityType activity,
-        int alternativeCount,
         CancellationToken ct = default)
     {
         var profile = OrsProfiles.Map(activity);
-        using var req = new HttpRequestMessage(HttpMethod.Post, $"/v2/directions/{profile}");
-        req.Headers.Add("Authorization", _options.ApiKey);
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"/v2/directions/{profile}/geojson");
+        req.Headers.TryAddWithoutValidation("Authorization", _options.ApiKey);
         req.Content = new StringContent(JsonSerializer.Serialize(new
         {
             coordinates = new[] { new[] { origin.Longitude, origin.Latitude }, new[] { destination.Longitude, destination.Latitude } },
-            alternative_routes = new { target_count = alternativeCount, weight_factor = 0.9 },
             geometry = true,
             instructions = false
         }), Encoding.UTF8, "application/json");
@@ -100,11 +98,11 @@ public sealed class OpenRouteServiceRoutingAdapter : IGeocodingProvider, IRouteP
         using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
 
         var result = new List<ExternalRoute>();
-        foreach (var routeEl in doc.RootElement.GetProperty("routes").EnumerateArray())
+        foreach (var routeEl in doc.RootElement.GetProperty("features").EnumerateArray())
         {
-            var summary = routeEl.GetProperty("summary");
+            var summary = routeEl.GetProperty("properties").GetProperty("summary");
             double distance = summary.GetProperty("distance").GetDouble();
-            int durationSeconds = summary.GetProperty("duration").GetInt32();
+            int durationSeconds = (int)Math.Round(summary.GetProperty("duration").GetDouble());
             var geometry = routeEl.GetProperty("geometry").GetProperty("coordinates");
 
             var points = new List<Coordinates>();

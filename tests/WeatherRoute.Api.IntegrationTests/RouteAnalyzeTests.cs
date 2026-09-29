@@ -215,7 +215,7 @@ public class RouteAnalyzeTests : IClassFixture<WebApplicationFactory<Program>>
         public StubRouteProvider(params ExternalRoute[] routes) => _routes = routes;
 
         public Task<IReadOnlyList<ExternalRoute>> CalculateRoutesAsync(
-            Coordinates o, Coordinates d, ActivityType a, int alternativeCount, CancellationToken ct = default) =>
+            Coordinates o, Coordinates d, ActivityType a, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<ExternalRoute>>(_routes);
     }
 
