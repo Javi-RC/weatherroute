@@ -30,7 +30,7 @@ import type { RouteCandidate, ActivityType } from "./types";
 const ERROR_MESSAGE = "No se pudo calcular la ruta. Revisa tu conexión e inténtalo de nuevo.";
 const REFRESH_ERROR_MESSAGE = "No se pudo actualizar la ruta. Se conservan los resultados anteriores.";
 const WEATHER_UNAVAILABLE_TOAST = "No hay previsión meteorológica para esa fecha. Mostramos distancia y duración.";
-const ROUTE_UNAVAILABLE_TOAST = "El servicio de rutas está temporalmente no disponible.";
+const ROUTE_UNAVAILABLE_TOAST = "No se pudo calcular una ruta entre esos puntos. Prueba a elegir otros puntos o a cambiar de actividad.";
 const LOCATION_ERROR_MESSAGE = "No pudimos obtener tu ubicación. Revisa los permisos del navegador.";
 
 function toMapRouteInput(
@@ -91,8 +91,8 @@ function AppContent() {
     saveToHistory: history.save,
     notifyRefreshError: () => addToast("error", REFRESH_ERROR_MESSAGE),
     notifyPartial: (data) => {
-      if (!data.weatherAvailable) addToast("info", WEATHER_UNAVAILABLE_TOAST);
-      else if (!data.routeAvailable) addToast("info", ROUTE_UNAVAILABLE_TOAST);
+      if (!data.routeAvailable) addToast("info", ROUTE_UNAVAILABLE_TOAST);
+      else if (!data.weatherAvailable) addToast("info", WEATHER_UNAVAILABLE_TOAST);
     },
     selectBestRoute: (data) => {
       setSelectedRouteId(data.routes.length > 0 ? findBestRouteIndex(data.routes) : null);

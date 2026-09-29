@@ -440,6 +440,31 @@ describe("App", () => {
     expect(calls.analyze).toBe(2);
   });
 
+  it("does not blame the weather when a route is unavailable", async () => {
+    mockFetch(() =>
+      new Response(
+        JSON.stringify({
+          ...ANALYSIS,
+          status: "partial",
+          routeAvailable: false,
+          weatherAvailable: false,
+          routes: [],
+        }),
+        { status: 200 },
+      ),
+    );
+    renderApp();
+
+    await typeAndSearch();
+
+    const toasts = await screen.findAllByRole("status");
+    expect(
+      toasts.some((element) => element.textContent?.includes("Mostramos distancia y duración")),
+    ).toBe(false);
+    expect(screen.getByText("No se pudo calcular una ruta entre esos puntos. Prueba a elegir otros puntos o a cambiar de actividad.")).toBeInTheDocument();
+    expect(screen.getByText("No hay ruta posible")).toBeInTheDocument();
+  });
+
   it("shows an info toast when the analysis is partial and weather is unavailable", async () => {
     mockFetch(() =>
       new Response(

@@ -88,6 +88,22 @@ describe("ResultsLayer", () => {
     expect(screen.queryByText("Lluvia máx.")).not.toBeInTheDocument();
   });
 
+  it("does not show the weather-unavailable banner when a route is unavailable", () => {
+    render(
+      <ResultsLayer
+        {...props({
+          viewState: "partial",
+          routeAvailable: false,
+          weatherAvailable: false,
+          routes: [],
+        })}
+      />,
+    );
+
+    expect(screen.queryByText(WEATHER_UNAVAILABLE_MESSAGE)).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("No hay ruta posible");
+  });
+
   it("renders a no-route explanation instead of an empty list", () => {
     render(
       <ResultsLayer

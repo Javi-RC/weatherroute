@@ -61,7 +61,7 @@ export default function ResultsLayer({
 
   return (
     <div className="space-y-4">
-      {!weatherAvailable && <PartialBanner>{WEATHER_UNAVAILABLE_MESSAGE}</PartialBanner>}
+      {!weatherAvailable && hasRoutes && <PartialBanner>{WEATHER_UNAVAILABLE_MESSAGE}</PartialBanner>}
       {noRouteReason && (
         <ErrorState
           title="No hay ruta posible"
